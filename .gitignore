@@ -1,0 +1,62 @@
+# Environment and API keys
+.env
+.env.*
+*.key
+secrets.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Experiment data files (can be regenerated)
+experiments/*/data/answers/*.json
+experiments/*/data/judgments/*.json
+experiments/*/data/results/*.csv
+experiments/*/data/results/*.png
+experiments/*/data/results/*.pdf
+
+# Keep directory structure
+!**/.gitkeep
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

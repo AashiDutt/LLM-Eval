@@ -1,0 +1,151 @@
+import time
+from typing import Dict, Any, Optional
+from anthropic import Anthropic
+from openai import OpenAI
+import google.generativeai as genai
+
+
+class ModelWrapper:
+    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+        self.api_key = api_key
+        self.model_name = model_name
+        self.config = config
+        self.timeout = config.get('generation', {}).get('timeout', 60)
+    
+    def generate(self, prompt: str, **kwargs) -> str:
+        raise NotImplementedError
+
+
+class ClaudeWrapper(ModelWrapper):
+    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+        super().__init__(api_key, model_name, config)
+        self.client = Anthropic(api_key=api_key)
+    
+    def generate(self, prompt: str, **kwargs) -> str:
+        temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
+        max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
+        
+        try:
+            response = self.client.messages.create(
+                model=self.model_name,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            return response.content[0].text
+        except Exception as e:
+            print(f"Error calling Claude API: {e}")
+            raise
+
+
+class GPTWrapper(ModelWrapper):
+    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+        super().__init__(api_key, model_name, config)
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1"
+        )
+    
+    def generate(self, prompt: str, **kwargs) -> str:
+        temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
+        max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                extra_headers={
+                    "HTTP-Referer": "https://github.com/llm-bias-eval",
+                    "X-Title": "LLM Bias Evaluation"
+                }
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Error calling GPT via OpenRouter: {e}")
+            raise
+
+
+class GeminiWrapper(ModelWrapper):
+    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+        super().__init__(api_key, model_name, config)
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel(model_name)
+    
+    def generate(self, prompt: str, **kwargs) -> str:
+        temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
+        max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
+        
+        generation_config = genai.GenerationConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+        )
+        
+        try:
+            response = self.model.generate_content(
+                prompt,
+                generation_config=generation_config
+            )
+            return response.text
+        except Exception as e:
+            print(f"Error calling Gemini API: {e}")
+            raise
+
+
+class ModelFactory:
+    def __init__(self, config: Dict[str, Any]):
+        self.config = config
+        self.api_keys = config.get('api_keys', {})
+        self.models_config = config.get('models', {})
+    
+    def get_model(self, vendor: str, tier: str) -> ModelWrapper:
+        vendor = vendor.lower()
+        tier = tier.lower()
+        
+        if vendor not in ['claude', 'gpt', 'gemini']:
+            raise ValueError(f"Unknown vendor: {vendor}")
+        
+        if tier not in ['fast', 'thinking']:
+            raise ValueError(f"Unknown tier: {tier}")
+        
+        if vendor == 'claude':
+            api_key = self.api_keys.get('anthropic')
+            model_name = self.models_config['claude'][tier]
+            return ClaudeWrapper(api_key, model_name, self.config)
+        
+        elif vendor == 'gpt':
+            api_key = self.api_keys.get('openrouter')
+            model_name = self.models_config['gpt'][tier]
+            return GPTWrapper(api_key, model_name, self.config)
+        
+        elif vendor == 'gemini':
+            api_key = self.api_keys.get('google')
+            model_name = self.models_config['gemini'][tier]
+            return GeminiWrapper(api_key, model_name, self.config)
+    
+    def get_all_models(self) -> Dict[str, ModelWrapper]:
+        models = {}
+        for vendor in ['claude', 'gpt', 'gemini']:
+            for tier in ['fast', 'thinking']:
+                key = f"{vendor}_{tier}"
+                models[key] = self.get_model(vendor, tier)
+        return models
+
+
+def test_model(wrapper: ModelWrapper, test_prompt: str = "Hello! Please respond with 'API working'.") -> bool:
+    try:
+        response = wrapper.generate(test_prompt)
+        if response and len(response) > 0:
+            print(f"✓ {wrapper.model_name} working")
+            return True
+        else:
+            print(f"✗ {wrapper.model_name} returned empty response")
+            return False
+    except Exception as e:
+        print(f"✗ {wrapper.model_name} failed: {e}")
+        return False
