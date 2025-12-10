@@ -78,13 +78,14 @@ jupyter notebook experiments/exp1_blind_judge/analysis.ipynb
 
 ## 🔑 Key Finding (Experiment 1)
 
-| Judge | Self-Bias? |
-|-------|------------|
-| Gemini | ❌ No (20%) |
-| Claude | ❌ No (60% for Claude, but not self) |
-| **GPT** | ⚠️ **Yes (80%)** |
+| Judge | Picks Own Vendor | Others Pick Same | Self-Bias? |
+|-------|------------------|------------------|------------|
+| Gemini | 20% | 20% (Claude) | ❌ No |
+| Claude | 60% | 60% (Gemini agrees) | ❌ No |
+| **GPT** | **80%** | 20% | ⚠️ **+60% bias** |
 
-**GPT shows strong self-preference bias** while Gemini and Claude do not.
+**GPT shows strong self-preference bias** (+60% vs other judges).  
+Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
 
 ## 📊 Models Supported
 
