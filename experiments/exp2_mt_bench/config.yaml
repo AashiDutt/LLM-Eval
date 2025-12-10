@@ -1,0 +1,63 @@
+# Configuration for Multi-Model Bias Evaluation
+
+# API Configuration
+api_keys:
+  anthropic: ${ANTHROPIC_API_KEY}
+  openrouter: ${OPENROUTER_API_KEY} 
+  google: ${GOOGLE_API_KEY}
+
+# Model Configuration (using actual model names)
+models:
+  claude:
+    fast: "claude-haiku-4-5"        # Fast tier: Claude Haiku 4.5
+    thinking: "claude-sonnet-4-5"   # Thinking tier: Claude Sonnet 4.5
+
+  gpt:
+    fast: "openai/gpt-5-mini"       # Fast tier: GPT-5 mini (via OpenRouter)
+    thinking: "openai/gpt-4.1"      # Thinking tier: GPT-4.1 (via OpenRouter)
+
+  gemini:
+    fast: "gemini-2.5-flash"        # Fast tier: Gemini 2.5 Flash
+    thinking: "gemini-3-pro-preview" # Thinking tier: Gemini 3 Pro (preview)
+
+# Judge Configuration
+judges:
+  primary: "gemini_thinking"  # Main judge for bias detection
+  additional:  # Optional: compare with other judges
+    - "claude_thinking"
+    - "gpt_thinking"
+
+# Generation Settings
+generation:
+  temperature: 0.7
+  max_tokens: 2048
+  timeout: 60  # seconds
+
+# Judging Settings
+judging:
+  temperature: 0.3  # Lower temperature for more consistent judging
+  max_tokens: 4096
+  shuffle_seed: 42  # For reproducible shuffling
+  anonymize: true
+
+# Experiment Settings
+experiment:
+  prompts_per_category: 30  # Number of prompts per category
+  categories:
+    - factual_qa
+    - reasoning_math
+    - coding
+    - summarization
+    - creative_writing
+    - safety_sensitive
+  
+  # Statistical testing
+  significance_level: 0.05
+  min_prompts_per_test: 10
+
+# Output Settings
+output:
+  save_intermediate: true
+  verbose: true
+  results_dir: "data/results"
+  timestamp_format: "%Y%m%d_%H%M%S"
