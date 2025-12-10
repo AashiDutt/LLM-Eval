@@ -26,12 +26,15 @@
 
 | Judge | Claude Wins | GPT Wins | Gemini Wins | Self-Bias? |
 |-------|-------------|----------|-------------|------------|
-| Gemini | 60% | 20% | 20% | ❌ No |
-| Claude | 60% | 20% | 20% | ❌ No |
-| GPT | 20% | **80%** | 0% | ⚠️ **YES** |
+| Gemini | 60% | 20% | 20% | ❌ No (20% for own) |
+| Claude | 60% | 20% | 20% | ❌ No (others agree) |
+| GPT | 20% | **80%** | 0% | ⚠️ **+60% bias** |
 
-## Key Finding
-**GPT shows strong self-preference bias (80%)** while Gemini and Claude do not show self-bias.
+## Key Findings
+
+1. **GPT shows strong self-preference bias**: 80% vs 20% from other judges (+60% difference)
+2. **Claude answers are genuinely preferred**: Both Gemini and Claude judges ranked Claude #1 at 60%
+3. **Gemini is impartial**: Only ranked itself #1 at 20% (below expected 33%)
 
 ## Files
 - `config.yaml` - Model configuration used
