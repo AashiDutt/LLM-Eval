@@ -75,7 +75,18 @@ class GeminiWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
         super().__init__(api_key, model_name, config)
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(model_name)
+        
+        safety_settings = [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
+        
+        self.model = genai.GenerativeModel(
+            model_name,
+            safety_settings=safety_settings
+        )
     
     def generate(self, prompt: str, **kwargs) -> str:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
@@ -91,10 +102,55 @@ class GeminiWrapper(ModelWrapper):
                 prompt,
                 generation_config=generation_config
             )
-            return response.text
+            if response.candidates and response.candidates[0].content.parts:
+                return response.candidates[0].content.parts[0].text
+            elif hasattr(response, 'text'):
+                return response.text
+            else:
+                raise ValueError(f"Empty response. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'No candidates'}")
         except Exception as e:
             print(f"Error calling Gemini API: {e}")
             raise
+
+
+class OpenRouterWrapper(ModelWrapper):
+    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+        super().__init__(api_key, model_name, config)
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1"
+        )
+    
+    def generate(self, prompt: str, **kwargs) -> str:
+        temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
+        max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
+        retries = kwargs.get('retries', 3)
+        
+        for attempt in range(retries):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant. Always respond with valid JSON only, no markdown formatting."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=temperature,
+                    max_tokens=max_tokens
+                )
+                result = response.choices[0].message.content
+                if result and len(result.strip()) > 10:
+                    return result
+                if attempt < retries - 1:
+                    print(f"  Retry {attempt + 1}: Empty or short response")
+                    time.sleep(1)
+            except Exception as e:
+                if attempt < retries - 1:
+                    print(f"  Retry {attempt + 1}: {e}")
+                    time.sleep(2)
+                else:
+                    print(f"Error calling OpenRouter ({self.model_name}): {e}")
+                    raise
+        raise ValueError(f"Failed after {retries} attempts")
 
 
 class ModelFactory:
@@ -124,9 +180,13 @@ class ModelFactory:
             return GPTWrapper(api_key, model_name, self.config)
         
         elif vendor == 'gemini':
-            api_key = self.api_keys.get('google')
             model_name = self.models_config['gemini'][tier]
-            return GeminiWrapper(api_key, model_name, self.config)
+            if model_name.startswith('google/'):
+                api_key = self.api_keys.get('openrouter')
+                return OpenRouterWrapper(api_key, model_name, self.config)
+            else:
+                api_key = self.api_keys.get('google')
+                return GeminiWrapper(api_key, model_name, self.config)
     
     def get_all_models(self) -> Dict[str, ModelWrapper]:
         models = {}

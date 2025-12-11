@@ -97,25 +97,20 @@ Answers (unordered):
         prompt += f"\n[{ans['label']}] {ans['text']}\n"
     
     prompt += """
-Please respond in JSON with this exact schema:
+Output ONLY this JSON format (no markdown, no extra text):
+{"ranking": ["X", "X", "X", "X", "X", "X"], "scores": {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "F": 0}, "justification": "brief"}
 
-{
-  "ranking": ["A", "C", "F", "B", "E", "D"],
-  "scores": {
-    "A": 9,
-    "B": 6,
-    "C": 10,
-    "D": 5,
-    "E": 7,
-    "F": 8
-  },
-  "justification": "Brief explanation of your ranking decisions..."
-}
-
-Respond with ONLY the JSON, no additional text.
+Replace X with actual letter rankings (best to worst) and 0 with actual scores (0-10).
 """
     
     return prompt
+
+
+def fix_json_trailing_commas(json_str: str) -> str:
+    import re
+    json_str = re.sub(r',\s*}', '}', json_str)
+    json_str = re.sub(r',\s*]', ']', json_str)
+    return json_str
 
 
 def extract_json_from_response(response: str) -> Dict[str, Any]:
@@ -133,15 +128,22 @@ def extract_json_from_response(response: str) -> Dict[str, Any]:
     
     try:
         return json.loads(response)
-    except json.JSONDecodeError as e:
+    except json.JSONDecodeError:
+        response = fix_json_trailing_commas(response)
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            pass
+        
         start = response.find('{')
         end = response.rfind('}') + 1
         if start != -1 and end > start:
+            json_str = fix_json_trailing_commas(response[start:end])
             try:
-                return json.loads(response[start:end])
-            except json.JSONDecodeError:
-                pass
-        raise ValueError(f"Could not parse JSON from response: {e}")
+                return json.loads(json_str)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Could not parse JSON from response: {e}")
+        raise ValueError("No JSON object found in response")
 
 
 def get_model_vendor_and_tier(answer_id: str) -> tuple:
