@@ -3,9 +3,13 @@ import json
 from pathlib import Path
 from tqdm import tqdm
 from typing import List, Dict, Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 from utils import load_config, load_prompts, save_json, generate_timestamp
 from models import ModelFactory
+
+print_lock = threading.Lock()
 
 
 def generate_answer(model_wrapper, prompt_text: str, retries: int = 3) -> str:
@@ -15,69 +19,87 @@ def generate_answer(model_wrapper, prompt_text: str, retries: int = 3) -> str:
             return answer
         except Exception as e:
             if attempt == retries - 1:
-                print(f"Failed after {retries} attempts: {e}")
                 return f"[ERROR: Failed to generate answer - {str(e)}]"
-            print(f"Attempt {attempt + 1} failed, retrying...")
             continue
+
+
+def generate_single_task(task: Dict[str, Any]) -> Dict[str, Any]:
+    model = task['model']
+    prompt = task['prompt']
+    vendor = task['vendor']
+    tier = task['tier']
+    
+    answer_text = generate_answer(model, prompt['text'])
+    
+    return {
+        "answer_id": f"ans_{prompt['id']}_{vendor}_{tier}",
+        "prompt_id": prompt['id'],
+        "category": prompt['category'],
+        "model_vendor": vendor,
+        "model_tier": tier,
+        "model_name": model.model_name,
+        "prompt_text": prompt['text'],
+        "answer_text": answer_text
+    }
 
 
 def generate_all_answers(
     prompts: List[Dict[str, Any]],
     model_factory: ModelFactory,
     output_dir: str,
-    verbose: bool = True
+    verbose: bool = True,
+    max_workers: int = 6
 ) -> List[Dict[str, Any]]:
-    all_answers = []
     models = model_factory.get_all_models()
-    
     vendors = ['claude', 'gpt', 'gemini']
     tiers = ['fast', 'thinking']
     
-    total_tasks = len(prompts) * len(vendors) * len(tiers)
-    pbar = tqdm(total=total_tasks, desc="Generating answers") if verbose else None
-    
+    tasks = []
     for prompt in prompts:
-        prompt_id = prompt['id']
-        prompt_text = prompt['text']
-        category = prompt['category']
-        
-        if verbose:
-            print(f"\n{'='*60}")
-            print(f"Processing: {prompt_id} ({category})")
-            print(f"Question: {prompt_text[:80]}...")
-        
         for vendor in vendors:
             for tier in tiers:
                 model_key = f"{vendor}_{tier}"
-                model = models[model_key]
-                
-                if verbose:
-                    print(f"  → {vendor.capitalize()} ({tier})...", end=" ")
-                
-                answer_text = generate_answer(model, prompt_text)
-                
-                answer_id = f"ans_{prompt_id}_{vendor}_{tier}"
-                answer_record = {
-                    "answer_id": answer_id,
-                    "prompt_id": prompt_id,
-                    "category": category,
-                    "model_vendor": vendor,
-                    "model_tier": tier,
-                    "model_name": model.model_name,
-                    "prompt_text": prompt_text,
-                    "answer_text": answer_text
-                }
-                
-                all_answers.append(answer_record)
-                
-                if verbose:
-                    print(f"✓ ({len(answer_text)} chars)")
-                
-                if pbar:
-                    pbar.update(1)
+                tasks.append({
+                    'model': models[model_key],
+                    'prompt': prompt,
+                    'vendor': vendor,
+                    'tier': tier
+                })
     
-    if pbar:
-        pbar.close()
+    total_tasks = len(tasks)
+    if verbose:
+        print(f"\nRunning {total_tasks} tasks with {max_workers} concurrent workers...")
+    
+    all_answers = []
+    completed = 0
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_task = {executor.submit(generate_single_task, task): task for task in tasks}
+        
+        pbar = tqdm(total=total_tasks, desc="Generating answers") if verbose else None
+        
+        for future in as_completed(future_to_task):
+            task = future_to_task[future]
+            try:
+                result = future.result()
+                all_answers.append(result)
+                completed += 1
+                
+                if verbose:
+                    with print_lock:
+                        status = "✓" if not result['answer_text'].startswith("[ERROR") else "✗"
+                        tqdm.write(f"  {status} {task['vendor']}_{task['tier']} → {task['prompt']['id']} ({len(result['answer_text'])} chars)")
+                
+            except Exception as e:
+                if verbose:
+                    with print_lock:
+                        tqdm.write(f"  ✗ {task['vendor']}_{task['tier']} → {task['prompt']['id']} FAILED: {e}")
+            
+            if pbar:
+                pbar.update(1)
+        
+        if pbar:
+            pbar.close()
     
     return all_answers
 
@@ -90,6 +112,7 @@ def main():
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--category", type=str, default=None)
     parser.add_argument("--verbose", action="store_true", default=True)
+    parser.add_argument("--workers", type=int, default=6, help="Number of concurrent workers (default: 6)")
     
     args = parser.parse_args()
     
@@ -109,6 +132,7 @@ def main():
     
     print(f"Processing {len(prompts)} prompts across 6 models (3 vendors × 2 tiers)")
     print(f"Total API calls: {len(prompts) * 6}")
+    print(f"Concurrent workers: {args.workers}")
     
     print("\nInitializing model factory...")
     model_factory = ModelFactory(config)
@@ -127,7 +151,8 @@ def main():
         prompts=prompts,
         model_factory=model_factory,
         output_dir="data/answers",
-        verbose=args.verbose
+        verbose=args.verbose,
+        max_workers=args.workers
     )
     
     if args.output is None:
