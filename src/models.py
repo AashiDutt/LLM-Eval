@@ -155,39 +155,43 @@ class OpenRouterWrapper(ModelWrapper):
 
 
 class ModelFactory:
+    VALID_VENDORS = ('claude', 'gpt', 'gemini')
+    VALID_TIERS = ('fast', 'thinking')
+    VENDOR_WRAPPERS = {
+        'claude': ('ANTHROPIC_API_KEY', 'anthropic', ClaudeWrapper),
+        'gpt': ('OPENROUTER_API_KEY', 'openrouter', GPTWrapper),
+    }
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.api_keys = config.get('api_keys', {})
         self.models_config = config.get('models', {})
-    
+
+    def _get_api_key(self, env_var: str, config_key: str) -> str:
+        return os.environ.get(env_var) or self.api_keys.get(config_key)
+
     def get_model(self, vendor: str, tier: str) -> ModelWrapper:
         vendor = vendor.lower()
         tier = tier.lower()
         
-        if vendor not in ['claude', 'gpt', 'gemini']:
+        if vendor not in self.VALID_VENDORS:
             raise ValueError(f"Unknown vendor: {vendor}")
         
-        if tier not in ['fast', 'thinking']:
+        if tier not in self.VALID_TIERS:
             raise ValueError(f"Unknown tier: {tier}")
         
-        if vendor == 'claude':
-            api_key = os.environ.get["ANTHROPIC_API_KEY"] or self.api_keys.get('anthropic')
-            model_name = self.models_config['claude'][tier]
-            return ClaudeWrapper(api_key, model_name, self.config)
+        if vendor in self.VENDOR_WRAPPERS:
+            env_var, key_name, wrapper_cls = self.VENDOR_WRAPPERS[vendor]
+            api_key = self._get_api_key(env_var, key_name)
+            model_name = self.models_config[vendor][tier]
+            return wrapper_cls(api_key, model_name, self.config)
         
-        elif vendor == 'gpt':
-            api_key = os.environ.get["OPENROUTER_API_KEY"] or self.api_keys.get('openrouter')
-            model_name = self.models_config['gpt'][tier]
-            return GPTWrapper(api_key, model_name, self.config)
-        
-        elif vendor == 'gemini':
-            model_name = self.models_config['gemini'][tier]
-            if model_name.startswith('google/'):
-                api_key = self.api_keys.get('openrouter')
-                return OpenRouterWrapper(api_key, model_name, self.config)
-            else:
-                api_key = os.environ.get["GOOGLE_API_KEY"] or self.api_keys.get('google')
-                return GeminiWrapper(api_key, model_name, self.config)
+        model_name = self.models_config['gemini'][tier]
+        if model_name.startswith('google/'):
+            api_key = self._get_api_key('OPENROUTER_API_KEY', 'openrouter')
+            return OpenRouterWrapper(api_key, model_name, self.config)
+        api_key = self._get_api_key('GOOGLE_API_KEY', 'google')
+        return GeminiWrapper(api_key, model_name, self.config)
     
     def get_all_models(self) -> Dict[str, ModelWrapper]:
         models = {}
