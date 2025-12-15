@@ -32,11 +32,11 @@
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
 | Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT | GPT-5-mini | GPT-4.1 |
-| Gemini | 2.5 Flash | 3 Pro |
+| GPT | GPT-5-mini | o4-mini |
+| Gemini | 2.5 Flash | 3 Pro Preview |
 
 ### Judges
-- `gemini_thinking`
+- `gemini_fast` (primary)
 - `claude_thinking`
 - `gpt_thinking`
 

@@ -6,19 +6,19 @@ api_keys:
   openrouter: ${OPENROUTER_API_KEY} 
   google: ${GOOGLE_API_KEY}
 
-# Model Configuration (using actual model names)
+# Model Configuration
 models:
   claude:
-    fast: "claude-haiku-4-5"        # Fast tier: Claude Haiku 4.5
-    thinking: "claude-sonnet-4-5"   # Thinking tier: Claude Sonnet 4.5
+    fast: "claude-haiku-4-5"
+    thinking: "claude-sonnet-4-5"
 
   gpt:
-    fast: "openai/gpt-5-mini"       # Fast tier: GPT-5 mini (via OpenRouter)
-    thinking: "openai/gpt-4.1"      # Thinking tier: GPT-4.1 (via OpenRouter)
+    fast: "openai/gpt-5-mini"
+    thinking: "openai/o4-mini"
 
   gemini:
-    fast: "gemini-2.5-flash"        # Fast tier: Gemini 2.5 Flash
-    thinking: "gemini-3-pro-preview" # Thinking tier: Gemini 3 Pro (preview)
+    fast: "google/gemini-2.5-flash"
+    thinking: "google/gemini-3-pro-preview"
 
 # Judge Configuration
 judges:
@@ -40,18 +40,8 @@ judging:
   shuffle_seed: 42  # For reproducible shuffling
   anonymize: true
 
-# Experiment Settings
-experiment:
-  prompts_per_category: 30  # Number of prompts per category
-  categories:
-    - factual_qa
-    - reasoning_math
-    - coding
-    - summarization
-    - creative_writing
-    - safety_sensitive
-  
-  # Statistical testing
+# Statistical Testing
+statistics:
   significance_level: 0.05
   min_prompts_per_test: 10
 
