@@ -1,6 +1,5 @@
 import argparse
 from tqdm import tqdm
-from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
@@ -10,18 +9,18 @@ from models import ModelFactory
 print_lock = threading.Lock()
 
 
-def generate_answer(model_wrapper, prompt_text: str, retries: int = 3) -> str:
+def generate_answer(model_wrapper, prompt_text: str, retries: int = 3) -> str | dict[str, str]:
     for attempt in range(retries):
         try:
             answer = model_wrapper.generate(prompt_text)
             return answer
         except Exception as e:
             if attempt == retries - 1:
-                return f"[ERROR: Failed to generate answer - {str(e)}]"
+                return {"error": str(e)}
             continue
 
 
-def generate_single_task(task: Dict[str, Any]) -> Dict[str, Any]:
+def generate_single_task(task: dict[str, str]) -> dict[ str, str]:
     model = task['model']
     prompt = task['prompt']
     vendor = task['vendor']
@@ -29,7 +28,7 @@ def generate_single_task(task: Dict[str, Any]) -> Dict[str, Any]:
     
     answer_text = generate_answer(model, prompt['text'])
     
-    return {
+    return_dict =  {
         "answer_id": f"ans_{prompt['id']}_{vendor}_{tier}",
         "prompt_id": prompt['id'],
         "category": prompt['category'],
@@ -37,16 +36,21 @@ def generate_single_task(task: Dict[str, Any]) -> Dict[str, Any]:
         "model_tier": tier,
         "model_name": model.model_name,
         "prompt_text": prompt['text'],
-        "answer_text": answer_text
     }
+    if isinstance(answer_text, dict) and "error" in answer_text:
+        return_dict.update(answer_text)
+    else:
+        return_dict["answer_text"] = answer_text
+
+    return return_dict
 
 
 def generate_all_answers(
-    prompts: List[Dict[str, Any]],
+    prompts: list[dict[str, str]],
     model_factory: ModelFactory,
     verbose: bool = True,
     max_workers: int = 6
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, str]]:
     models = model_factory.get_all_models()
     vendors = ['claude', 'gpt', 'gemini']
     tiers = ['fast', 'thinking']
@@ -85,7 +89,7 @@ def generate_all_answers(
                 
                 if verbose:
                     with print_lock:
-                        status = "✓" if not result['answer_text'].startswith("[ERROR") else "✗"
+                        status = "✓" if "error" not in result else "✗"
                         tqdm.write(f"  {status} {task['vendor']}_{task['tier']} → {task['prompt']['id']} ({len(result['answer_text'])} chars)")
                 
             except Exception as e:

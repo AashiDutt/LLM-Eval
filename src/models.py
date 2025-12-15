@@ -1,5 +1,5 @@
 import time
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from anthropic import Anthropic
 from openai import OpenAI
 import google.generativeai as genai
@@ -181,7 +181,7 @@ class ModelFactory:
     def _get_api_key(self, env_var: str, config_key: str) -> str:
         return os.environ.get(env_var) or self.api_keys.get(config_key)
 
-    def get_model(self, vendor: str, tier: str) -> ModelWrapper:
+    def get_model(self, vendor: str, tier: str, model_name_override: Optional[str] = None) -> ModelWrapper:
         vendor = vendor.lower()
         tier = tier.lower()
         
@@ -194,18 +194,21 @@ class ModelFactory:
         if vendor in self.VENDOR_WRAPPERS:
             env_var, key_name, wrapper_cls = self.VENDOR_WRAPPERS[vendor]
             api_key = self._get_api_key(env_var, key_name)
-            if vendor in self.models_config and tier in self.models_config[vendor]:
-                model_name = self.models_config[vendor][tier]
-                return wrapper_cls(api_key, model_name, self.config)
+            vendor_models = self.models_config.get(vendor, {})
+            model_name = model_name_override or vendor_models.get(tier)
+            if not model_name:
+                raise KeyError(f"Missing model config for {vendor}.{tier}")
+            return wrapper_cls(api_key, model_name, self.config)
         
-        if "gemini" in self.models_config:
-            if tier in self.models_config['gemini']:
-                model_name = self.models_config['gemini'][tier]
-                if model_name.startswith('google/'):
-                    api_key = self._get_api_key('OPENROUTER_API_KEY', 'openrouter')
-                    return OpenRouterWrapper(api_key, model_name, self.config)
-                api_key = self._get_api_key('GOOGLE_API_KEY', 'google')
-                return GeminiWrapper(api_key, model_name, self.config)
+        gemini_models = self.models_config.get('gemini', {})
+        model_name = model_name_override or gemini_models.get(tier)
+        if not model_name:
+            raise KeyError(f"Missing model config for gemini.{tier}")
+        if model_name.startswith('google/'):
+            api_key = self._get_api_key('OPENROUTER_API_KEY', 'openrouter')
+            return OpenRouterWrapper(api_key, model_name, self.config)
+        api_key = self._get_api_key('GOOGLE_API_KEY', 'google')
+        return GeminiWrapper(api_key, model_name, self.config)
     
     def get_all_models(self) -> Dict[str, ModelWrapper]:
         models = {}

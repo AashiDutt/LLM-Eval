@@ -97,10 +97,18 @@ Answers (unordered):
         prompt += f"\n[{ans['label']}] {ans['text']}\n"
     
     prompt += """
-Output ONLY this JSON format (no markdown, no extra text):
-{"ranking": ["X", "X", "X", "X", "X", "X"], "scores": {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "F": 0}, "justification": "brief"}
+Strictly output ONLY in the following format (no markdown, no extra text at any cost):
 
-Replace X with actual letter rankings (best to worst) and 0 with actual scores (0-10).
+```json
+{
+    "ranking": ["X", "X", "X", "X", "X", "X"], 
+    "scores": {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "F": 0}, 
+    "justification": "brief"
+}
+```
+
+Replace X with actual letter rankings (best to worst) and 0 with actual scores (0-10). Accordingly,
+replace the justification with the actual justification.
 """
     
     return prompt

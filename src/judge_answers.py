@@ -1,6 +1,7 @@
 import argparse
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
-from typing import List, Dict, Any
 
 from utils import (
     load_config, load_json, save_json, generate_timestamp,
@@ -8,28 +9,35 @@ from utils import (
 )
 from models import ModelFactory
 
+print_lock = threading.Lock()
+
+
+def thread_safe_print(*args, **kwargs):
+    with print_lock:
+        print(*args, **kwargs)
+
 
 def judge_prompt_answers(
     prompt_id: str,
     prompt_text: str,
-    answers: List[Dict[str, Any]],
+    answers: list[dict[str, str]],
     judge_model,
     judge_name: str,
     shuffle_seed: int,
     verbose: bool = False
-) -> Dict[str, Any]:
+) -> dict[str, str]:
     anonymized, mapping = anonymize_and_shuffle(answers, seed=shuffle_seed)
     judge_prompt = format_judge_prompt(prompt_text, anonymized)
     
     if verbose:
-        print(f"  Judge prompt: {len(judge_prompt)} chars")
-        print(f"  Mapping: {mapping}")
+        thread_safe_print(f"  Judge prompt: {len(judge_prompt)} chars")
+        thread_safe_print(f"  Mapping: {mapping}")
     
     try:
         response = judge_model.generate(judge_prompt, temperature=0.3)
         
         if verbose:
-            print(f"  Judge response: {response[:200]}...")
+            thread_safe_print(f"  Judge response: {response[:200]}...")
         
         judgment = extract_json_from_response(response)
         
@@ -52,7 +60,7 @@ def judge_prompt_answers(
         return judgment_record
         
     except Exception as e:
-        print(f"  ✗ Error judging {prompt_id} with {judge_name}: {e}")
+        thread_safe_print(f"  ✗ Error judging {prompt_id} with {judge_name}: {e}")
         return {
             "prompt_id": prompt_id,
             "judge_model": judge_name,
@@ -62,12 +70,13 @@ def judge_prompt_answers(
 
 
 def judge_all_answers(
-    answers: List[Dict[str, Any]],
+    answers: list[dict[str, str]],
     model_factory: ModelFactory,
-    config: Dict[str, Any],
-    judges: List[str],
-    verbose: bool = True
-) -> List[Dict[str, Any]]:
+    config: dict[str, str],
+    judges: list[str],
+    verbose: bool = True,
+    max_workers: int = 4
+) -> list[dict[str, str]]:
     all_judgments = []
     
     answers_by_prompt = {}
@@ -86,9 +95,7 @@ def judge_all_answers(
         vendor, tier = judge_key.split('_')
         judge_models[judge_key] = model_factory.get_model(vendor, tier)
     
-    total_tasks = len(answers_by_prompt) * len(judges)
-    pbar = tqdm(total=total_tasks, desc="Judging answers") if verbose else None
-    
+    tasks = []
     for prompt_id, prompt_answers in answers_by_prompt.items():
         prompt_text = prompt_answers[0]['prompt_text']
         category = prompt_answers[0]['category']
@@ -100,29 +107,52 @@ def judge_all_answers(
             print(f"Answers: {len(prompt_answers)}")
         
         for judge_key in judges:
-            judge_model = judge_models[judge_key]
-            
-            if verbose:
-                print(f"  → Judge: {judge_key}...")
-            
-            judgment = judge_prompt_answers(
-                prompt_id=prompt_id,
-                prompt_text=prompt_text,
-                answers=prompt_answers,
-                judge_model=judge_model,
-                judge_name=judge_key,
+            if judge_models[judge_key] is not None:
+                tasks.append({
+                    "prompt_id": prompt_id,
+                    "prompt_text": prompt_text,
+                    "answers": prompt_answers,
+                    "judge_key": judge_key,
+                    "judge_model": judge_models[judge_key]
+                })
+    
+    total_tasks = len(tasks)
+    if verbose:
+        print(f"\nRunning {total_tasks} judgment tasks with {max_workers} concurrent workers...")
+    pbar = tqdm(total=total_tasks, desc="Judging answers") if verbose else None
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_task = {
+            executor.submit(
+                judge_prompt_answers,
+                prompt_id=task["prompt_id"],
+                prompt_text=task["prompt_text"],
+                answers=task["answers"],
+                judge_model=task["judge_model"],
+                judge_name=task["judge_key"],
                 shuffle_seed=shuffle_seed,
                 verbose=verbose
-            )
-            
-            all_judgments.append(judgment)
-            
-            if verbose and 'error' not in judgment:
-                top_answer = judgment['mapping'][judgment['ranking'][0]]
-                print(f"  ✓ Top answer: {top_answer}")
-            
-            if pbar:
-                pbar.update(1)
+            ): task for task in tasks
+        }
+        
+        for future in as_completed(future_to_task):
+            task = future_to_task[future]
+            try:
+                judgment = future.result()
+                all_judgments.append(judgment)
+                
+                if verbose:
+                    if 'error' in judgment:
+                        thread_safe_print(f"  ✗ {task['judge_key']} → {task['prompt_id']}: {judgment['error']}")
+                    else:
+                        top_label = judgment['ranking'][0]
+                        top_answer = judgment['mapping'].get(top_label, top_label)
+                        thread_safe_print(f"  ✓ {task['judge_key']} → {task['prompt_id']} (top: {top_answer})")
+            except Exception as e:
+                thread_safe_print(f"  ✗ {task['judge_key']} → {task['prompt_id']} FAILED: {e}")
+            finally:
+                if pbar:
+                    pbar.update(1)
     
     if pbar:
         pbar.close()
@@ -138,6 +168,7 @@ def main():
     parser.add_argument("--judges", type=str, nargs='+', default=None)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--verbose", action="store_true", default=True)
+    parser.add_argument("--workers", type=int, default=6, help="Number of concurrent judging workers (default: 4)")
     
     args = parser.parse_args()
     
@@ -175,7 +206,8 @@ def main():
         model_factory=model_factory,
         config=config,
         judges=judges,
-        verbose=args.verbose
+        verbose=args.verbose,
+        max_workers=args.workers
     )
     
     if args.output is None:
