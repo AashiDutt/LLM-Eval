@@ -44,9 +44,14 @@ class ClaudeWrapper(ModelWrapper):
 class GPTWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
         super().__init__(api_key, model_name, config)
+        openai_models = config.get("models")["gpt"]
+        self.use_openrouter_for_openai = all(
+            openai_models[tier].startswith("openai/") for tier in openai_models
+        )
+
         self.client = OpenAI(
             api_key=api_key,
-            base_url="https://openrouter.ai/api/v1"
+            base_url="https://openrouter.ai/api/v1" if self.use_openrouter_for_openai else None
         )
     
     def generate(self, prompt: str, **kwargs) -> str:
@@ -54,18 +59,23 @@ class GPTWrapper(ModelWrapper):
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                extra_headers={
+            kwargs = {
+                "model": self.model_name, "messages": [{"role": "user", "content": prompt}],
+                "extra_headers": {
                     "HTTP-Referer": "https://github.com/llm-bias-eval",
                     "X-Title": "LLM Bias Evaluation"
-                }
-            )
+                },
+            }
+            if self.use_openrouter_for_openai:
+                kwargs.update({"max_tokens": max_tokens})
+            else:
+                kwargs.update({"max_completion_tokens": max_tokens})
+
+            if "gpt-5" not in self.model_name:
+                # GPT-5 models don't support temperature.
+                kwargs.update({"temperature": temperature})
+            
+            response = self.client.chat.completions.create(**kwargs)
             return response.choices[0].message.content
         except Exception as e:
             print(f"Error calling GPT via OpenRouter: {e}")
@@ -117,6 +127,7 @@ class GeminiWrapper(ModelWrapper):
 class OpenRouterWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
         super().__init__(api_key, model_name, config)
+        
         self.client = OpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1"
@@ -183,15 +194,18 @@ class ModelFactory:
         if vendor in self.VENDOR_WRAPPERS:
             env_var, key_name, wrapper_cls = self.VENDOR_WRAPPERS[vendor]
             api_key = self._get_api_key(env_var, key_name)
-            model_name = self.models_config[vendor][tier]
-            return wrapper_cls(api_key, model_name, self.config)
+            if vendor in self.models_config and tier in self.models_config[vendor]:
+                model_name = self.models_config[vendor][tier]
+                return wrapper_cls(api_key, model_name, self.config)
         
-        model_name = self.models_config['gemini'][tier]
-        if model_name.startswith('google/'):
-            api_key = self._get_api_key('OPENROUTER_API_KEY', 'openrouter')
-            return OpenRouterWrapper(api_key, model_name, self.config)
-        api_key = self._get_api_key('GOOGLE_API_KEY', 'google')
-        return GeminiWrapper(api_key, model_name, self.config)
+        if "gemini" in self.models_config:
+            if tier in self.models_config['gemini']:
+                model_name = self.models_config['gemini'][tier]
+                if model_name.startswith('google/'):
+                    api_key = self._get_api_key('OPENROUTER_API_KEY', 'openrouter')
+                    return OpenRouterWrapper(api_key, model_name, self.config)
+                api_key = self._get_api_key('GOOGLE_API_KEY', 'google')
+                return GeminiWrapper(api_key, model_name, self.config)
     
     def get_all_models(self) -> Dict[str, ModelWrapper]:
         models = {}

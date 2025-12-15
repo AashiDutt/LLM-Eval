@@ -56,12 +56,13 @@ def generate_all_answers(
         for vendor in vendors:
             for tier in tiers:
                 model_key = f"{vendor}_{tier}"
-                tasks.append({
-                    'model': models[model_key],
-                    'prompt': prompt,
-                    'vendor': vendor,
-                    'tier': tier
-                })
+                if models[model_key] is not None:
+                    tasks.append({
+                        'model': models[model_key],
+                        'prompt': prompt,
+                        'vendor': vendor,
+                        'tier': tier
+                    })
     
     total_tasks = len(tasks)
     if verbose:
@@ -138,7 +139,8 @@ def main():
     models = model_factory.get_all_models()
     for name, model in models.items():
         vendor, tier = name.split('_')
-        print(f"  {vendor.capitalize()} ({tier}): {model.model_name}")
+        if model and tier:
+            print(f"  {vendor.capitalize()} ({tier}): {model.model_name}")
     
     print("\n" + "="*60)
     print("STARTING ANSWER GENERATION")
