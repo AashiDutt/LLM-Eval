@@ -1,6 +1,4 @@
 import argparse
-import json
-from pathlib import Path
 from tqdm import tqdm
 from typing import List, Dict, Any
 
@@ -68,7 +66,6 @@ def judge_all_answers(
     model_factory: ModelFactory,
     config: Dict[str, Any],
     judges: List[str],
-    output_dir: str,
     verbose: bool = True
 ) -> List[Dict[str, Any]]:
     all_judgments = []
@@ -178,7 +175,6 @@ def main():
         model_factory=model_factory,
         config=config,
         judges=judges,
-        output_dir="data/judgments",
         verbose=args.verbose
     )
     

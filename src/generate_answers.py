@@ -1,6 +1,4 @@
 import argparse
-import json
-from pathlib import Path
 from tqdm import tqdm
 from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -46,7 +44,6 @@ def generate_single_task(task: Dict[str, Any]) -> Dict[str, Any]:
 def generate_all_answers(
     prompts: List[Dict[str, Any]],
     model_factory: ModelFactory,
-    output_dir: str,
     verbose: bool = True,
     max_workers: int = 6
 ) -> List[Dict[str, Any]]:
@@ -150,7 +147,6 @@ def main():
     answers = generate_all_answers(
         prompts=prompts,
         model_factory=model_factory,
-        output_dir="data/answers",
         verbose=args.verbose,
         max_workers=args.workers
     )

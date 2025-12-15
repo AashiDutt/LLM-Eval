@@ -1,8 +1,9 @@
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from anthropic import Anthropic
 from openai import OpenAI
 import google.generativeai as genai
+import os
 
 
 class ModelWrapper:
@@ -170,12 +171,12 @@ class ModelFactory:
             raise ValueError(f"Unknown tier: {tier}")
         
         if vendor == 'claude':
-            api_key = self.api_keys.get('anthropic')
+            api_key = os.environ.get["ANTHROPIC_API_KEY"] or self.api_keys.get('anthropic')
             model_name = self.models_config['claude'][tier]
             return ClaudeWrapper(api_key, model_name, self.config)
         
         elif vendor == 'gpt':
-            api_key = self.api_keys.get('openrouter')
+            api_key = os.environ.get["OPENROUTER_API_KEY"] or self.api_keys.get('openrouter')
             model_name = self.models_config['gpt'][tier]
             return GPTWrapper(api_key, model_name, self.config)
         
@@ -185,7 +186,7 @@ class ModelFactory:
                 api_key = self.api_keys.get('openrouter')
                 return OpenRouterWrapper(api_key, model_name, self.config)
             else:
-                api_key = self.api_keys.get('google')
+                api_key = os.environ.get["GOOGLE_API_KEY"] or self.api_keys.get('google')
                 return GeminiWrapper(api_key, model_name, self.config)
     
     def get_all_models(self) -> Dict[str, ModelWrapper]:
