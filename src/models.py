@@ -2,7 +2,7 @@ import time
 from typing import Dict, Any, Optional
 from anthropic import Anthropic
 from openai import OpenAI
-import google.generativeai as genai
+import google.genai as genai
 import os
 
 
@@ -13,7 +13,7 @@ class ModelWrapper:
         self.config = config
         self.timeout = config.get('generation', {}).get('timeout', 60)
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> str:
         raise NotImplementedError
 
 
@@ -22,7 +22,7 @@ class ClaudeWrapper(ModelWrapper):
         super().__init__(api_key, model_name, config)
         self.client = Anthropic(api_key=api_key)
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> str:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
         
@@ -31,6 +31,7 @@ class ClaudeWrapper(ModelWrapper):
                 model=self.model_name,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                system=system_prompt,
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
@@ -54,28 +55,32 @@ class GPTWrapper(ModelWrapper):
             base_url="https://openrouter.ai/api/v1" if self.use_openrouter_for_openai else None
         )
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> str:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
         
         try:
-            kwargs = {
-                "model": self.model_name, "messages": [{"role": "user", "content": prompt}],
+            request_kwargs = {
+                "model": self.model_name,
+                "messages": (
+                    ([{"role": "system", "content": system_prompt}] if system_prompt else [])
+                    + [{"role": "user", "content": prompt}]
+                ),
                 "extra_headers": {
                     "HTTP-Referer": "https://github.com/llm-bias-eval",
                     "X-Title": "LLM Bias Evaluation"
                 },
             }
             if self.use_openrouter_for_openai:
-                kwargs.update({"max_tokens": max_tokens})
+                request_kwargs.update({"max_tokens": max_tokens})
             else:
-                kwargs.update({"max_completion_tokens": max_tokens})
+                request_kwargs.update({"max_completion_tokens": max_tokens})
 
             if "gpt-5" not in self.model_name:
                 # GPT-5 models don't support temperature.
-                kwargs.update({"temperature": temperature})
+                request_kwargs.update({"temperature": temperature})
             
-            response = self.client.chat.completions.create(**kwargs)
+            response = self.client.chat.completions.create(**request_kwargs)
             return response.choices[0].message.content
         except Exception as e:
             print(f"Error calling GPT via OpenRouter: {e}")
@@ -85,35 +90,34 @@ class GPTWrapper(ModelWrapper):
 class GeminiWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
         super().__init__(api_key, model_name, config)
-        genai.configure(api_key=api_key)
         
-        safety_settings = [
+        self.safety_settings = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
         
-        self.model = genai.GenerativeModel(
-            model_name,
-            safety_settings=safety_settings
-        )
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = model_name
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> str:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
         
-        generation_config = genai.GenerationConfig(
-            temperature=temperature,
+        config = genai.types.GenerateContentConfig(
+            system_instruction=system_prompt, 
+            temperature=temperature, 
             max_output_tokens=max_tokens,
+            safety_settings=self.safety_settings
         )
+        prompt_text = prompt
         
         try:
-            response = self.model.generate_content(
-                prompt,
-                generation_config=generation_config
+            response = self.client.models.generate_content(
+                model=self.model_name, contents=prompt_text, config=config
             )
-            if response.candidates and response.candidates[0].content.parts:
+            if hasattr(response, "candidates") and response.candidates and response.candidates[0].content.parts:
                 return response.candidates[0].content.parts[0].text
             elif hasattr(response, 'text'):
                 return response.text
@@ -133,17 +137,18 @@ class OpenRouterWrapper(ModelWrapper):
             base_url="https://openrouter.ai/api/v1"
         )
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(self, prompt: str, system_prompt: Optional[str] = None, **kwargs) -> str:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
         retries = kwargs.get('retries', 3)
+        system_message = system_prompt or "You are a helpful assistant. Always respond with valid JSON only, no markdown formatting."
         
         for attempt in range(retries):
             try:
                 response = self.client.chat.completions.create(
                     model=self.model_name,
                     messages=[
-                        {"role": "system", "content": "You are a helpful assistant. Always respond with valid JSON only, no markdown formatting."},
+                        {"role": "system", "content": system_message},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=temperature,

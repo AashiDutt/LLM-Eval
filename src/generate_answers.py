@@ -3,8 +3,8 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-from utils import load_config, load_prompts, save_json, generate_timestamp
-from models import ModelFactory
+from .utils import load_config, load_prompts, save_json, generate_timestamp
+from .models import ModelFactory
 
 print_lock = threading.Lock()
 

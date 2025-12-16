@@ -13,12 +13,12 @@ models:
     thinking: "claude-sonnet-4-5"   # Thinking tier: Claude Sonnet 4.5
 
   gpt:
-    fast: "openai/gpt-5-mini"       # Fast tier: GPT-5 mini (via OpenRouter)
-    thinking: "openai/gpt-4.1"      # Thinking tier: GPT-4.1 (via OpenRouter)
+    fast: "gpt-5-mini"       # Fast tier: GPT-5 mini (via OpenRouter)
+    thinking: "gpt-5.2"      # Thinking tier: GPT-4.1 (via OpenRouter)
 
   gemini:
-    fast: "google/gemini-2.5-flash"         # Fast tier (also used for judging)
-    thinking: "google/gemini-3-pro-preview" # Thinking tier for answer generation
+    fast: "gemini-2.5-flash"         # Fast tier (also used for judging)
+    thinking: "gemini-3-pro-preview" # Thinking tier for answer generation
 
 # Judge Configuration
 judges:

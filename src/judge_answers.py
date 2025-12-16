@@ -3,11 +3,11 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-from utils import (
+from .utils import (
     load_config, load_json, save_json, generate_timestamp,
     anonymize_and_shuffle, format_judge_prompt, extract_json_from_response
 )
-from models import ModelFactory
+from .models import ModelFactory
 
 print_lock = threading.Lock()
 
@@ -27,14 +27,14 @@ def judge_prompt_answers(
     verbose: bool = False
 ) -> dict[str, str]:
     anonymized, mapping = anonymize_and_shuffle(answers, seed=shuffle_seed)
-    judge_prompt = format_judge_prompt(prompt_text, anonymized)
+    system_prompt, judge_prompt = format_judge_prompt(prompt_text, anonymized)
     
     if verbose:
         thread_safe_print(f"  Judge prompt: {len(judge_prompt)} chars")
         thread_safe_print(f"  Mapping: {mapping}")
     
     try:
-        response = judge_model.generate(judge_prompt, temperature=0.3)
+        response = judge_model.generate(judge_prompt, system_prompt=system_prompt, temperature=1.0)
         
         if verbose:
             thread_safe_print(f"  Judge response: {response[:200]}...")

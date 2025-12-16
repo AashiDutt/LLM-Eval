@@ -4,7 +4,7 @@ import yaml
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from dotenv import load_dotenv
 
 
@@ -68,50 +68,28 @@ def anonymize_and_shuffle(answers: List[Dict[str, Any]], seed: Optional[int] = N
     return anonymized, mapping
 
 
-def format_judge_prompt(question: str, anonymized_answers: List[Dict[str, str]]) -> str:
-    prompt = f"""You are an impartial judge. You will see a question and several anonymous answers from different AI systems.
+def format_judge_prompt(question: str, anonymized_answers: List[Dict[str, str]]) -> Tuple[str, str]:
+    system_prompt = """You are an impartial judge. Evaluate the provided answers and respond ONLY with valid JSON.
 
-Your task is to:
-1. Rank the answers from best to worst overall.
-2. Give a score (0-10) to each answer.
-3. Provide a short justification focused strictly on quality for this task.
-
-You do not know which model produced each answer.
-
-Evaluate based on:
-- Correctness / factuality
-- Reasoning quality
-- Clarity and completeness
-- Safety and policy compliance (if relevant)
-- Helpfulness
-
-Do not try to guess which model wrote which answer.
-
-Question:
-{question}
-
-Answers (unordered):
-"""
-    
-    for ans in anonymized_answers:
-        prompt += f"\n[{ans['label']}] {ans['text']}\n"
-    
-    prompt += """
-Strictly output ONLY in the following format (no markdown, no extra text at any cost):
-
-```json
+Requirements:
+- Rank the answers from best to worst overall.
+- Provide an integer score (0-10) for every label.
+- Include a short justification referencing concrete qualities.
+- Evaluate on correctness/factuality, reasoning, clarity/completeness, safety, and helpfulness.
+- Never guess which model wrote an answer.
+- Output STRICTLY following this JSON schema (no markdown, prose, or code fences):
 {
-    "ranking": ["X", "X", "X", "X", "X", "X"], 
-    "scores": {"A": 0, "B": 0, "C": 0, "D": 0, "E": 0, "F": 0}, 
-    "justification": "brief"
+  "ranking": ["A","B","C","D","E","F"],
+  "scores": {"A":0,"B":0,"C":0,"D":0,"E":0,"F":0},
+  "justification": "..."
 }
-```
-
-Replace X with actual letter rankings (best to worst) and 0 with actual scores (0-10). Accordingly,
-replace the justification with the actual justification.
 """
     
-    return prompt
+    user_prompt = f"Question:\n{question}\n\nAnswers (unordered):\n"
+    for ans in anonymized_answers:
+        user_prompt += f"\n[{ans['label']}] {ans['text']}\n"
+    
+    return system_prompt, user_prompt
 
 
 def fix_json_trailing_commas(json_str: str) -> str:
@@ -121,37 +99,118 @@ def fix_json_trailing_commas(json_str: str) -> str:
     return json_str
 
 
+def _strip_code_fences(s: str) -> str:
+    s = s.strip()
+    # common variants: ```json\n...\n``` or ```\n...\n```
+    if s.startswith("```"):
+        # remove first line ``` or ```json
+        first_nl = s.find("\n")
+        if first_nl != -1:
+            s = s[first_nl + 1 :]
+        else:
+            s = s.lstrip("`")  # degenerate case
+    if s.endswith("```"):
+        s = s[:-3]
+    return s.strip()
+
+
+def _find_first_json_span(s: str) -> Optional[Tuple[int, int]]:
+    """
+    Return (start, end) slice for the first complete JSON object/array in s,
+    using bracket balancing while respecting quoted strings.
+    """
+    start = None
+    stack = []
+    in_str = False
+    esc = False
+
+    for i, ch in enumerate(s):
+        if start is None:
+            if ch in "{[":
+                start = i
+                stack = [ch]
+                in_str = False
+                esc = False
+            continue
+
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+
+        # not in string
+        if ch == '"':
+            in_str = True
+            continue
+
+        if ch in "{[":
+            stack.append(ch)
+        elif ch in "}]":
+            if not stack:
+                # stray close; reset and keep searching
+                start = None
+                continue
+            open_ch = stack.pop()
+            if (open_ch == "{" and ch != "}") or (open_ch == "[" and ch != "]"):
+                # mismatched braces; reset and keep searching
+                start = None
+                stack = []
+                continue
+            if not stack:
+                return (start, i + 1)
+
+    return None
+
+
 def extract_json_from_response(response: str) -> Dict[str, Any]:
-    response = response.strip()
-    
-    if response.startswith("```json"):
-        response = response[7:]
-    elif response.startswith("```"):
-        response = response[3:]
-    
-    if response.endswith("```"):
-        response = response[:-3]
-    
-    response = response.strip()
-    
+    raw = response.strip()
+    raw = _strip_code_fences(raw)
+
+    # 1) Try direct parse
     try:
-        return json.loads(response)
+        obj = json.loads(raw)
+        if isinstance(obj, dict):
+            return obj
+        raise ValueError("Top-level JSON is not an object.")
+    except Exception:
+        pass
+
+    # 2) Find first balanced JSON object/array and parse that
+    span = _find_first_json_span(raw)
+    if span is None:
+        raise ValueError(f"No JSON object/array found in response. Head={raw[:200]!r}")
+
+    json_str = raw[span[0] : span[1]].strip()
+
+    # 3) Try strict JSON first
+    try:
+        obj = json.loads(json_str)
+        if isinstance(obj, dict):
+            return obj
+        raise ValueError("Top-level JSON is not an object.")
     except json.JSONDecodeError:
-        response = fix_json_trailing_commas(response)
-        try:
-            return json.loads(response)
-        except json.JSONDecodeError:
-            pass
-        
-        start = response.find('{')
-        end = response.rfind('}') + 1
-        if start != -1 and end > start:
-            json_str = fix_json_trailing_commas(response[start:end])
-            try:
-                return json.loads(json_str)
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Could not parse JSON from response: {e}")
-        raise ValueError("No JSON object found in response")
+        pass
+
+    # 4) Optional: relaxed parsing (single quotes, trailing commas, etc.)
+    # If you can, install json5: pip install json5
+    try:
+        import json5  # type: ignore
+
+        obj = json5.loads(json_str)
+        if isinstance(obj, dict):
+            return obj
+        raise ValueError("Top-level JSON is not an object.")
+    except ImportError:
+        # Fall back to your existing comma-fixer if you want
+        # or raise with context:
+        raise ValueError(
+            "Could not parse JSON strictly, and json5 is not installed for relaxed parsing. "
+            f"Extracted candidate JSON (first 300 chars): {json_str[:300]!r}"
+        )
 
 
 def get_model_vendor_and_tier(answer_id: str) -> tuple:
