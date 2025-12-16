@@ -36,7 +36,7 @@
 | Gemini | 2.5 Flash | 3 Pro |
 
 ### Judges
-- `gemini_thinking`
+- `gemini_fast` (primary)
 - `claude_thinking`
 - `gpt_thinking`
 
