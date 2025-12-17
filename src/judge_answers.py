@@ -2,14 +2,35 @@ import argparse
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
+from pydantic import BaseModel, Field
 
 from .utils import (
     load_config, load_json, save_json, generate_timestamp,
     anonymize_and_shuffle, format_judge_prompt, extract_json_from_response
 )
-from .models import ModelFactory
+from .models import ModelFactory, ModelWrapper
 
 print_lock = threading.Lock()
+
+TEMPERATURE_MAP = {
+    "claude-haiku-4-5": 0.5,
+    "claude-sonnet-4-5": 0.5,
+    "google/gemini-2.5-flash": 0.5,
+    "google/gemini-3-pro-preview": 1.0,
+    "gemini-2.5-flash": 0.5,
+    "gemini-3-pro-preview": 1.0
+}
+
+class JudgmentSchema(BaseModel):
+    ranking: list[str] = Field(
+        ..., description="Ordered list of anonymized answer labels from best to worst."
+    )
+    scores: dict[str, int] = Field(
+        ..., description="Dictionary mapping each label to an integer score between 0 and 10."
+    )
+    justification: str = Field(
+        ..., description="Short explanation referencing concrete qualities that justify the ranking."
+    )
 
 
 def thread_safe_print(*args, **kwargs):
@@ -21,7 +42,7 @@ def judge_prompt_answers(
     prompt_id: str,
     prompt_text: str,
     answers: list[dict[str, str]],
-    judge_model,
+    judge_model: ModelWrapper,
     judge_name: str,
     shuffle_seed: int,
     verbose: bool = False
@@ -34,12 +55,25 @@ def judge_prompt_answers(
         thread_safe_print(f"  Mapping: {mapping}")
     
     try:
-        response = judge_model.generate(judge_prompt, system_prompt=system_prompt, temperature=1.0)
+        model_id = judge_model.model_name
+        is_openai = "gpt" in model_id
+        generate_kwargs = {
+            "prompt": judge_prompt, "system_prompt": system_prompt, "response_model": JudgmentSchema
+        }
+        if not is_openai:
+            generate_kwargs.update({"temperature": TEMPERATURE_MAP[model_id]})
+        response = judge_model.generate(**generate_kwargs)
         
         if verbose:
-            thread_safe_print(f"  Judge response: {response[:200]}...")
+            preview = response if isinstance(response, str) else str(response)
+            thread_safe_print(f"  Judge response: {preview[:200]}...")
         
-        judgment = extract_json_from_response(response)
+        if isinstance(response, BaseModel):
+            judgment = response.model_dump()
+        elif isinstance(response, dict):
+            judgment = response
+        else:
+            judgment = extract_json_from_response(response)
         
         required_fields = ['ranking', 'scores', 'justification']
         for field in required_fields:
@@ -77,7 +111,6 @@ def judge_all_answers(
     verbose: bool = True,
     max_workers: int = 4
 ) -> list[dict[str, str]]:
-    all_judgments = []
     
     answers_by_prompt = {}
     for answer in answers:
@@ -119,10 +152,15 @@ def judge_all_answers(
     total_tasks = len(tasks)
     if verbose:
         print(f"\nRunning {total_tasks} judgment tasks with {max_workers} concurrent workers...")
+    
+    if total_tasks == 0:
+        return []
+    
+    ordered_judgments: list[dict[str, str] | None] = [None] * total_tasks
     pbar = tqdm(total=total_tasks, desc="Judging answers") if verbose else None
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_task = {
+        future_to_index = {
             executor.submit(
                 judge_prompt_answers,
                 prompt_id=task["prompt_id"],
@@ -132,14 +170,15 @@ def judge_all_answers(
                 judge_name=task["judge_key"],
                 shuffle_seed=shuffle_seed,
                 verbose=verbose
-            ): task for task in tasks
+            ): idx for idx, task in enumerate(tasks)
         }
         
-        for future in as_completed(future_to_task):
-            task = future_to_task[future]
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
+            task = tasks[idx]
             try:
                 judgment = future.result()
-                all_judgments.append(judgment)
+                ordered_judgments[idx] = judgment
                 
                 if verbose:
                     if 'error' in judgment:
@@ -157,7 +196,7 @@ def judge_all_answers(
     if pbar:
         pbar.close()
     
-    return all_judgments
+    return [judgment for judgment in ordered_judgments if judgment is not None]
 
 
 def main():

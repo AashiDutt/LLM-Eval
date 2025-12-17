@@ -72,20 +72,24 @@ def generate_all_answers(
     if verbose:
         print(f"\nRunning {total_tasks} tasks with {max_workers} concurrent workers...")
     
-    all_answers = []
-    completed = 0
+    if total_tasks == 0:
+        return []
+    
+    ordered_answers: list[dict[str, str] | None] = [None] * total_tasks
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_task = {executor.submit(generate_single_task, task): task for task in tasks}
-        
+        future_to_index = {
+            executor.submit(generate_single_task, task): idx
+            for idx, task in enumerate(tasks)
+        }
         pbar = tqdm(total=total_tasks, desc="Generating answers") if verbose else None
         
-        for future in as_completed(future_to_task):
-            task = future_to_task[future]
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
+            task = tasks[idx]
             try:
                 result = future.result()
-                all_answers.append(result)
-                completed += 1
+                ordered_answers[idx] = result
                 
                 if verbose:
                     with print_lock:
@@ -103,7 +107,7 @@ def generate_all_answers(
         if pbar:
             pbar.close()
     
-    return all_answers
+    return [answer for answer in ordered_answers if answer is not None]
 
 
 def main():
