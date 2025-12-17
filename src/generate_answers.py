@@ -1,6 +1,7 @@
 import argparse
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -17,7 +18,12 @@ from src.models import ModelFactory
 print_lock = threading.Lock()
 
 
-def generate_answer(model_wrapper, prompt_text: str, retries: int = 3) -> str | dict[str, str]:
+def generate_answer(
+    model_wrapper,
+    prompt_text: str,
+    retries: int = 3,
+    retry_delay: float = 1.0
+) -> str | dict[str, str]:
     for attempt in range(retries):
         try:
             answer = model_wrapper.generate(prompt_text)
@@ -25,16 +31,26 @@ def generate_answer(model_wrapper, prompt_text: str, retries: int = 3) -> str | 
         except Exception as e:
             if attempt == retries - 1:
                 return {"error": str(e)}
+            time.sleep(retry_delay)
             continue
 
 
-def generate_single_task(task: dict[str, str]) -> dict[ str, str]:
+def generate_single_task(
+    task: dict[str, str],
+    retries: int,
+    retry_delay: float
+) -> dict[str, str]:
     model = task['model']
     prompt = task['prompt']
     vendor = task['vendor']
     tier = task['tier']
     
-    answer_text = generate_answer(model, prompt['text'])
+    answer_text = generate_answer(
+        model,
+        prompt['text'],
+        retries=retries,
+        retry_delay=retry_delay
+    )
     
     return_dict =  {
         "answer_id": f"ans_{prompt['id']}_{vendor}_{tier}",
@@ -57,7 +73,9 @@ def generate_all_answers(
     prompts: list[dict[str, str]],
     model_factory: ModelFactory,
     verbose: bool = True,
-    max_workers: int = 6
+    max_workers: int = 6,
+    retries: int = 3,
+    retry_delay: float = 1.0
 ) -> list[dict[str, str]]:
     models = model_factory.get_all_models()
     vendors = ['claude', 'gpt', 'gemini']
@@ -87,7 +105,12 @@ def generate_all_answers(
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_index = {
-            executor.submit(generate_single_task, task): idx
+            executor.submit(
+                generate_single_task,
+                task,
+                retries,
+                retry_delay
+            ): idx
             for idx, task in enumerate(tasks)
         }
         pbar = tqdm(total=total_tasks, desc="Generating answers") if verbose else None
@@ -102,7 +125,11 @@ def generate_all_answers(
                 if verbose:
                     with print_lock:
                         status = "✓" if "error" not in result else "✗"
-                        tqdm.write(f"  {status} {task['vendor']}_{task['tier']} → {task['prompt']['id']} ({len(result['answer_text'])} chars)")
+                        detail = (
+                            f"{len(result['answer_text'])} chars"
+                            if "answer_text" in result else result.get("error", "error")
+                        )
+                        tqdm.write(f"  {status} {task['vendor']}_{task['tier']} → {task['prompt']['id']} ({detail})")
                 
             except Exception as e:
                 if verbose:
@@ -127,6 +154,8 @@ def main():
     parser.add_argument("--category", type=str, default=None)
     parser.add_argument("--verbose", action="store_true", default=True)
     parser.add_argument("--workers", type=int, default=6, help="Number of concurrent workers (default: 6)")
+    parser.add_argument("--retries", type=int, default=3, help="Number of retries per generation (default: 3)")
+    parser.add_argument("--retry-delay", type=float, default=1.0, help="Seconds to wait between retries (default: 1.0)")
     
     args = parser.parse_args()
     
@@ -166,7 +195,9 @@ def main():
         prompts=prompts,
         model_factory=model_factory,
         verbose=args.verbose,
-        max_workers=args.workers
+        max_workers=args.workers,
+        retries=args.retries,
+        retry_delay=args.retry_delay
     )
     
     if args.output is None:

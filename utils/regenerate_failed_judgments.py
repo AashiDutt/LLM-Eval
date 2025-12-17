@@ -9,6 +9,7 @@ re-evaluates them with only the judge model responsible for the failure.
 from __future__ import annotations
 
 import argparse
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
@@ -38,6 +39,7 @@ def run_with_retries(
     shuffle_seed: int,
     verbose: bool,
     retries: int,
+    retry_delay: float,
 ):
     last_exc: Optional[Exception] = None
     for attempt in range(retries):
@@ -54,6 +56,8 @@ def run_with_retries(
             )
         except Exception as exc:
             last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(retry_delay)
     raise RuntimeError(f"Failed after {retries} attempts: {last_exc}")
 
 
@@ -94,6 +98,12 @@ def main() -> None:
         type=int,
         default=4,
         help="How many times to retry a failed judgment before giving up (default: 1).",
+    )
+    parser.add_argument(
+        "--retry-delay",
+        type=float,
+        default=1.0,
+        help="Seconds to wait between retry attempts (default: 1.0).",
     )
     args = parser.parse_args()
 
@@ -171,6 +181,7 @@ def main() -> None:
                 shuffle_seed,
                 args.verbose,
                 args.retries,
+                args.retry_delay,
             )
             future_to_task[future] = task
 
