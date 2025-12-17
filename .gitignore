@@ -37,7 +37,9 @@ env/
 
 # Experiment data files (can be regenerated)
 experiments/*/data/answers/*.json
+experiments/*/data/answers/*.bak
 experiments/*/data/judgments/*.json
+experiments/*/data/judgments/*.bak
 experiments/*/data/results/*.csv
 experiments/*/data/results/*.png
 experiments/*/data/results/*.pdf

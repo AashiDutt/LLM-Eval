@@ -1,8 +1,11 @@
+import os
 import time
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional, Type
+
+import google.genai as genai
 from anthropic import Anthropic
 from openai import OpenAI
-import google.generativeai as genai
+from pydantic import BaseModel
 
 
 class ModelWrapper:
@@ -12,29 +15,81 @@ class ModelWrapper:
         self.config = config
         self.timeout = config.get('generation', {}).get('timeout', 60)
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        response_model: Optional[Type[BaseModel]] = None,
+        **kwargs
+    ) -> Any:
         raise NotImplementedError
+
+    @staticmethod
+    def _coerce_structured_response(
+        payload: Any,
+        response_model: Optional[Type[BaseModel]]
+    ) -> Any:
+        if response_model is None:
+            return payload
+        if isinstance(payload, response_model):
+            return payload
+        if isinstance(payload, BaseModel):
+            return response_model.model_validate(payload.model_dump())
+        if isinstance(payload, dict):
+            return response_model.model_validate(payload)
+        if isinstance(payload, str):
+            return response_model.model_validate_json(payload)
+        raise ValueError(
+            f"Unsupported structured payload type: {type(payload)}"
+        )
 
 
 class ClaudeWrapper(ModelWrapper):
+    # https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+    STRUCTURED_OUTPUTS_BETA = ["structured-outputs-2025-11-13"]
+
     def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
         super().__init__(api_key, model_name, config)
         self.client = Anthropic(api_key=api_key)
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        response_model: Optional[Type[BaseModel]] = None,
+        **kwargs
+    ) -> Any:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
         
         try:
+            if response_model is not None:
+                try:
+                    response = self.client.beta.messages.parse(
+                        model=self.model_name,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        system=system_prompt,
+                        betas=self.STRUCTURED_OUTPUTS_BETA,
+                        messages=[{"role": "user", "content": prompt}],
+                        output_format=response_model,
+                    )
+                    return self._coerce_structured_response(response.parsed_output, response_model)
+                except Exception as structured_error:
+                    print(f"Structured Claude output failed ({self.model_name}): {structured_error}")
             response = self.client.messages.create(
                 model=self.model_name,
                 max_tokens=max_tokens,
                 temperature=temperature,
+                system=system_prompt,
                 messages=[
                     {"role": "user", "content": prompt}
                 ]
             )
-            return response.content[0].text
+            result = response.content[0].text
+            if response_model is not None:
+                return self._coerce_structured_response(result, response_model)
+            return result
         except Exception as e:
             print(f"Error calling Claude API: {e}")
             raise
@@ -43,29 +98,107 @@ class ClaudeWrapper(ModelWrapper):
 class GPTWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
         super().__init__(api_key, model_name, config)
+        openai_models = config.get("models")["gpt"]
+        self.use_openrouter_for_openai = all(
+            openai_models[tier].startswith("openai/") for tier in openai_models
+        )
+
         self.client = OpenAI(
             api_key=api_key,
-            base_url="https://openrouter.ai/api/v1"
+            base_url="https://openrouter.ai/api/v1" if self.use_openrouter_for_openai else None
         )
+
+    @staticmethod
+    def _build_messages(system_prompt: Optional[str], prompt: str) -> list[dict[str, str]]:
+        messages: list[dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        return messages
+
+    def _call_native_openai(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+        response_model: Optional[Type[BaseModel]]
+    ) -> Any:
+        if response_model is not None:
+            try:
+                response = self.client.responses.parse(
+                    model=self.model_name,
+                    input=messages,
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                    text_format=response_model,
+                )
+                return self._coerce_structured_response(response.output_parsed, response_model)
+            except Exception as structured_error:
+                print(f"Structured OpenAI output failed ({self.model_name}): {structured_error}")
+        request_kwargs = {
+            "model": self.model_name,
+            "messages": messages,
+            "max_completion_tokens": max_tokens,
+        }
+        if "gpt-5" not in self.model_name:
+            request_kwargs["temperature"] = temperature
+        response = self.client.chat.completions.create(**request_kwargs)
+        message_content = response.choices[0].message.content
+        if isinstance(message_content, list):
+            text = "".join(getattr(part, "text", "") for part in message_content)
+        else:
+            text = message_content or ""
+        if response_model is not None:
+            return self._coerce_structured_response(text, response_model)
+        return text
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        response_model: Optional[Type[BaseModel]] = None,
+        **kwargs
+    ) -> Any:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
-        
+        messages = self._build_messages(system_prompt, prompt)
+
+        if not self.use_openrouter_for_openai:
+            return self._call_native_openai(messages, temperature, max_tokens, response_model)
+
         try:
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                extra_headers={
+            request_kwargs = {
+                "model": self.model_name,
+                "messages": messages,
+                "extra_headers": {
                     "HTTP-Referer": "https://github.com/llm-bias-eval",
                     "X-Title": "LLM Bias Evaluation"
+                },
+            }
+            request_kwargs.update({"max_tokens": max_tokens})
+
+            if "gpt-5" not in self.model_name:
+                # GPT-5 models don't support temperature.
+                request_kwargs.update({"temperature": temperature})
+            if response_model is not None:
+                request_kwargs["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": response_model.__name__,
+                        "schema": response_model.model_json_schema(),
+                        "strict": True,
+                    },
                 }
-            )
-            return response.choices[0].message.content
+            
+            response = self.client.chat.completions.create(**request_kwargs)
+            message_content = response.choices[0].message.content
+            if isinstance(message_content, list):
+                text = "".join(getattr(part, "text", "") for part in message_content)
+            else:
+                text = message_content or ""
+            if response_model is not None:
+                return self._coerce_structured_response(text, response_model)
+            return text
         except Exception as e:
             print(f"Error calling GPT via OpenRouter: {e}")
             raise
@@ -74,40 +207,58 @@ class GPTWrapper(ModelWrapper):
 class GeminiWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
         super().__init__(api_key, model_name, config)
-        genai.configure(api_key=api_key)
         
-        safety_settings = [
+        self.safety_settings = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
         
-        self.model = genai.GenerativeModel(
-            model_name,
-            safety_settings=safety_settings
-        )
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = model_name
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        response_model: Optional[Type[BaseModel]] = None,
+        **kwargs
+    ) -> Any:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
         
-        generation_config = genai.GenerationConfig(
-            temperature=temperature,
-            max_output_tokens=max_tokens,
-        )
+        config_kwargs: Dict[str, Any] = {
+            "system_instruction": system_prompt,
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+            "safety_settings": self.safety_settings,
+        }
+        if response_model is not None:
+            config_kwargs["response_mime_type"] = "application/json"
+            config_kwargs["response_json_schema"] = response_model.model_json_schema()
+        config = genai.types.GenerateContentConfig(**config_kwargs)
+        prompt_text = prompt
         
         try:
-            response = self.model.generate_content(
-                prompt,
-                generation_config=generation_config
+            response = self.client.models.generate_content(
+                model=self.model_name, contents=prompt_text, config=config
             )
-            if response.candidates and response.candidates[0].content.parts:
-                return response.candidates[0].content.parts[0].text
-            elif hasattr(response, 'text'):
-                return response.text
-            else:
-                raise ValueError(f"Empty response. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'No candidates'}")
+            text_output = None
+            if hasattr(response, "text") and response.text:
+                text_output = response.text
+            elif hasattr(response, "candidates") and response.candidates and response.candidates[0].content.parts:
+                text_output = response.candidates[0].content.parts[0].text
+            if not text_output:
+                finish_reason = (
+                    response.candidates[0].finish_reason
+                    if hasattr(response, "candidates") and response.candidates
+                    else 'No candidates'
+                )
+                raise ValueError(f"Empty response. Finish reason: {finish_reason}")
+            if response_model is not None:
+                return self._coerce_structured_response(text_output, response_model)
+            return text_output
         except Exception as e:
             print(f"Error calling Gemini API: {e}")
             raise
@@ -116,29 +267,56 @@ class GeminiWrapper(ModelWrapper):
 class OpenRouterWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
         super().__init__(api_key, model_name, config)
+        
         self.client = OpenAI(
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1"
         )
     
-    def generate(self, prompt: str, **kwargs) -> str:
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        response_model: Optional[Type[BaseModel]] = None,
+        **kwargs
+    ) -> Any:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
         retries = kwargs.get('retries', 3)
+        system_message = system_prompt or "You are a helpful assistant. Always respond with valid JSON only, no markdown formatting."
+        response_format = None
+        if response_model is not None:
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": response_model.__name__,
+                    "schema": response_model.model_json_schema(),
+                    "strict": True,
+                },
+            }
+        base_payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        if response_format:
+            base_payload["response_format"] = response_format
         
         for attempt in range(retries):
             try:
-                response = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "system", "content": "You are a helpful assistant. Always respond with valid JSON only, no markdown formatting."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=temperature,
-                    max_tokens=max_tokens
-                )
-                result = response.choices[0].message.content
+                response = self.client.chat.completions.create(**base_payload)
+                message_content = response.choices[0].message.content
+                if isinstance(message_content, list):
+                    result = "".join(getattr(part, "text", "") for part in message_content)
+                else:
+                    result = message_content or ""
                 if result and len(result.strip()) > 10:
+                    if response_model is not None:
+                        return self._coerce_structured_response(result, response_model)
                     return result
                 if attempt < retries - 1:
                     print(f"  Retry {attempt + 1}: Empty or short response")
@@ -154,39 +332,49 @@ class OpenRouterWrapper(ModelWrapper):
 
 
 class ModelFactory:
+    VALID_VENDORS = ('claude', 'gpt', 'gemini')
+    VALID_TIERS = ('fast', 'thinking')
+    VENDOR_WRAPPERS = {
+        'claude': ('ANTHROPIC_API_KEY', 'anthropic', ClaudeWrapper),
+        'gpt': ('OPENROUTER_API_KEY', 'openrouter', GPTWrapper),
+    }
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self.api_keys = config.get('api_keys', {})
         self.models_config = config.get('models', {})
-    
-    def get_model(self, vendor: str, tier: str) -> ModelWrapper:
+
+    def _get_api_key(self, env_var: str, config_key: str) -> str:
+        return os.environ.get(env_var) or self.api_keys.get(config_key)
+
+    def get_model(self, vendor: str, tier: str, model_name_override: Optional[str] = None) -> ModelWrapper:
         vendor = vendor.lower()
         tier = tier.lower()
         
-        if vendor not in ['claude', 'gpt', 'gemini']:
+        if vendor not in self.VALID_VENDORS:
             raise ValueError(f"Unknown vendor: {vendor}")
         
-        if tier not in ['fast', 'thinking']:
+        if tier not in self.VALID_TIERS:
             raise ValueError(f"Unknown tier: {tier}")
         
-        if vendor == 'claude':
-            api_key = self.api_keys.get('anthropic')
-            model_name = self.models_config['claude'][tier]
-            return ClaudeWrapper(api_key, model_name, self.config)
+        if vendor in self.VENDOR_WRAPPERS:
+            env_var, key_name, wrapper_cls = self.VENDOR_WRAPPERS[vendor]
+            api_key = self._get_api_key(env_var, key_name)
+            vendor_models = self.models_config.get(vendor, {})
+            model_name = model_name_override or vendor_models.get(tier)
+            if not model_name:
+                raise KeyError(f"Missing model config for {vendor}.{tier}")
+            return wrapper_cls(api_key, model_name, self.config)
         
-        elif vendor == 'gpt':
-            api_key = self.api_keys.get('openrouter')
-            model_name = self.models_config['gpt'][tier]
-            return GPTWrapper(api_key, model_name, self.config)
-        
-        elif vendor == 'gemini':
-            model_name = self.models_config['gemini'][tier]
-            if model_name.startswith('google/'):
-                api_key = self.api_keys.get('openrouter')
-                return OpenRouterWrapper(api_key, model_name, self.config)
-            else:
-                api_key = self.api_keys.get('google')
-                return GeminiWrapper(api_key, model_name, self.config)
+        gemini_models = self.models_config.get('gemini', {})
+        model_name = model_name_override or gemini_models.get(tier)
+        if not model_name:
+            raise KeyError(f"Missing model config for gemini.{tier}")
+        if model_name.startswith('google/'):
+            api_key = self._get_api_key('OPENROUTER_API_KEY', 'openrouter')
+            return OpenRouterWrapper(api_key, model_name, self.config)
+        api_key = self._get_api_key('GOOGLE_API_KEY', 'google')
+        return GeminiWrapper(api_key, model_name, self.config)
     
     def get_all_models(self) -> Dict[str, ModelWrapper]:
         models = {}

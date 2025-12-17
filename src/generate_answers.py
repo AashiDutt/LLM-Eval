@@ -1,29 +1,26 @@
 import argparse
-import json
-from pathlib import Path
 from tqdm import tqdm
-from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-from utils import load_config, load_prompts, save_json, generate_timestamp
-from models import ModelFactory
+from .utils import load_config, load_prompts, save_json, generate_timestamp
+from .models import ModelFactory
 
 print_lock = threading.Lock()
 
 
-def generate_answer(model_wrapper, prompt_text: str, retries: int = 3) -> str:
+def generate_answer(model_wrapper, prompt_text: str, retries: int = 3) -> str | dict[str, str]:
     for attempt in range(retries):
         try:
             answer = model_wrapper.generate(prompt_text)
             return answer
         except Exception as e:
             if attempt == retries - 1:
-                return f"[ERROR: Failed to generate answer - {str(e)}]"
+                return {"error": str(e)}
             continue
 
 
-def generate_single_task(task: Dict[str, Any]) -> Dict[str, Any]:
+def generate_single_task(task: dict[str, str]) -> dict[ str, str]:
     model = task['model']
     prompt = task['prompt']
     vendor = task['vendor']
@@ -31,7 +28,7 @@ def generate_single_task(task: Dict[str, Any]) -> Dict[str, Any]:
     
     answer_text = generate_answer(model, prompt['text'])
     
-    return {
+    return_dict =  {
         "answer_id": f"ans_{prompt['id']}_{vendor}_{tier}",
         "prompt_id": prompt['id'],
         "category": prompt['category'],
@@ -39,17 +36,21 @@ def generate_single_task(task: Dict[str, Any]) -> Dict[str, Any]:
         "model_tier": tier,
         "model_name": model.model_name,
         "prompt_text": prompt['text'],
-        "answer_text": answer_text
     }
+    if isinstance(answer_text, dict) and "error" in answer_text:
+        return_dict.update(answer_text)
+    else:
+        return_dict["answer_text"] = answer_text
+
+    return return_dict
 
 
 def generate_all_answers(
-    prompts: List[Dict[str, Any]],
+    prompts: list[dict[str, str]],
     model_factory: ModelFactory,
-    output_dir: str,
     verbose: bool = True,
     max_workers: int = 6
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, str]]:
     models = model_factory.get_all_models()
     vendors = ['claude', 'gpt', 'gemini']
     tiers = ['fast', 'thinking']
@@ -59,35 +60,40 @@ def generate_all_answers(
         for vendor in vendors:
             for tier in tiers:
                 model_key = f"{vendor}_{tier}"
-                tasks.append({
-                    'model': models[model_key],
-                    'prompt': prompt,
-                    'vendor': vendor,
-                    'tier': tier
-                })
+                if models[model_key] is not None:
+                    tasks.append({
+                        'model': models[model_key],
+                        'prompt': prompt,
+                        'vendor': vendor,
+                        'tier': tier
+                    })
     
     total_tasks = len(tasks)
     if verbose:
         print(f"\nRunning {total_tasks} tasks with {max_workers} concurrent workers...")
     
-    all_answers = []
-    completed = 0
+    if total_tasks == 0:
+        return []
+    
+    ordered_answers: list[dict[str, str] | None] = [None] * total_tasks
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_task = {executor.submit(generate_single_task, task): task for task in tasks}
-        
+        future_to_index = {
+            executor.submit(generate_single_task, task): idx
+            for idx, task in enumerate(tasks)
+        }
         pbar = tqdm(total=total_tasks, desc="Generating answers") if verbose else None
         
-        for future in as_completed(future_to_task):
-            task = future_to_task[future]
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
+            task = tasks[idx]
             try:
                 result = future.result()
-                all_answers.append(result)
-                completed += 1
+                ordered_answers[idx] = result
                 
                 if verbose:
                     with print_lock:
-                        status = "✓" if not result['answer_text'].startswith("[ERROR") else "✗"
+                        status = "✓" if "error" not in result else "✗"
                         tqdm.write(f"  {status} {task['vendor']}_{task['tier']} → {task['prompt']['id']} ({len(result['answer_text'])} chars)")
                 
             except Exception as e:
@@ -101,7 +107,7 @@ def generate_all_answers(
         if pbar:
             pbar.close()
     
-    return all_answers
+    return [answer for answer in ordered_answers if answer is not None]
 
 
 def main():
@@ -141,7 +147,8 @@ def main():
     models = model_factory.get_all_models()
     for name, model in models.items():
         vendor, tier = name.split('_')
-        print(f"  {vendor.capitalize()} ({tier}): {model.model_name}")
+        if model and tier:
+            print(f"  {vendor.capitalize()} ({tier}): {model.model_name}")
     
     print("\n" + "="*60)
     print("STARTING ANSWER GENERATION")
@@ -150,7 +157,6 @@ def main():
     answers = generate_all_answers(
         prompts=prompts,
         model_factory=model_factory,
-        output_dir="data/answers",
         verbose=args.verbose,
         max_workers=args.workers
     )
