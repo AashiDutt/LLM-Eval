@@ -71,18 +71,23 @@ def anonymize_and_shuffle(answers: List[Dict[str, Any]], seed: Optional[int] = N
 def format_judge_prompt(question: str, anonymized_answers: List[Dict[str, str]]) -> Tuple[str, str]:
     system_prompt = """You are an impartial judge. Evaluate the provided answers and respond ONLY with valid JSON.
 
+For inputs, you will be provided with a question and different answers obtained from different AI models.
+
 Requirements:
 - Rank the answers from best to worst overall.
 - Provide an integer score (0-10) for every label.
 - Include a short justification referencing concrete qualities.
 - Evaluate on correctness/factuality, reasoning, clarity/completeness, safety, and helpfulness.
 - Never guess which model wrote an answer.
-- Output STRICTLY following this JSON schema (no markdown, prose, or code fences):
+- Output STRICTLY following this JSON schema (no markdown, prose, or code fences). If you were provided with
+  six different answers, a dummy output would look like so:
 {
   "ranking": ["A","B","C","D","E","F"],
   "scores": {"A":0,"B":0,"C":0,"D":0,"E":0,"F":0},
   "justification": "..."
 }
+  "scores" must include all labels exactly once as keys (A-F), each mapped to an integer 0-10.
+
 """
     
     user_prompt = f"Question:\n{question}\n\nAnswers (unordered):\n"

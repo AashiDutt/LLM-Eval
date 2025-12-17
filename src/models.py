@@ -1,7 +1,7 @@
 import os
 import time
 from typing import Any, Dict, Optional, Type
-
+import json
 import google.genai as genai
 from anthropic import Anthropic
 from openai import OpenAI
@@ -27,21 +27,37 @@ class ModelWrapper:
     @staticmethod
     def _coerce_structured_response(
         payload: Any,
-        response_model: Optional[Type[BaseModel]]
-    ) -> Any:
+        response_model: Optional[Type[BaseModel]],
+    ) -> str:
+        print(f"{payload=}")
         if response_model is None:
-            return payload
-        if isinstance(payload, response_model):
-            return payload
-        if isinstance(payload, BaseModel):
-            return response_model.model_validate(payload.model_dump())
-        if isinstance(payload, dict):
-            return response_model.model_validate(payload)
-        if isinstance(payload, str):
-            return response_model.model_validate_json(payload)
-        raise ValueError(
-            f"Unsupported structured payload type: {type(payload)}"
-        )
+            return payload if isinstance(payload, str) else str(payload)
+
+        try:
+            # ---- validation only ----
+            if isinstance(payload, response_model):
+                pass
+            elif isinstance(payload, BaseModel):
+                response_model.model_validate(payload.model_dump())
+            elif isinstance(payload, dict):
+                response_model.model_validate(payload)
+            elif isinstance(payload, str):
+                response_model.model_validate_json(payload)
+            else:
+                raise ValueError(
+                    f"Unsupported structured payload type: {type(payload)}"
+                )
+
+            # ---- success: always return string ----
+            if isinstance(payload, BaseModel):
+                return payload.model_dump_json()
+            if isinstance(payload, dict):
+                return json.dumps(payload)
+            return payload if isinstance(payload, str) else str(payload)
+
+        except Exception:
+            # ---- failure: propagate ----
+            raise
 
 
 class ClaudeWrapper(ModelWrapper):
@@ -61,34 +77,27 @@ class ClaudeWrapper(ModelWrapper):
     ) -> Any:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
         max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
-        
+
+        kwargs = {
+            "model": self.model_name, "max_tokens": max_tokens, "temperature": temperature,
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        if system_prompt is not None:
+            kwargs["system"] = system_prompt
         try:
             if response_model is not None:
                 try:
-                    response = self.client.beta.messages.parse(
-                        model=self.model_name,
-                        max_tokens=max_tokens,
-                        temperature=temperature,
-                        system=system_prompt,
-                        betas=self.STRUCTURED_OUTPUTS_BETA,
-                        messages=[{"role": "user", "content": prompt}],
-                        output_format=response_model,
+                    kwargs.update(
+                        {"betas": self.STRUCTURED_OUTPUTS_BETA, "output_format": response_model}
                     )
+                    response = self.client.beta.messages.parse(**kwargs)
                     return self._coerce_structured_response(response.parsed_output, response_model)
                 except Exception as structured_error:
                     print(f"Structured Claude output failed ({self.model_name}): {structured_error}")
-            response = self.client.messages.create(
-                model=self.model_name,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
+                    raise
+
+            response = self.client.messages.create(**kwargs)
             result = response.content[0].text
-            if response_model is not None:
-                return self._coerce_structured_response(result, response_model)
             return result
         except Exception as e:
             print(f"Error calling Claude API: {e}")
@@ -123,33 +132,29 @@ class GPTWrapper(ModelWrapper):
         max_tokens: int,
         response_model: Optional[Type[BaseModel]]
     ) -> Any:
+        is_gpt5 = "gpt-5" in self.model_name
+        request_kwargs = {"model": self.model_name, "messages": messages}
+        if not is_gpt5:
+            request_kwargs["temperature"] = temperature
+        
         if response_model is not None:
             try:
-                response = self.client.responses.parse(
-                    model=self.model_name,
-                    input=messages,
-                    temperature=temperature,
-                    max_output_tokens=max_tokens,
-                    text_format=response_model,
-                )
+                request_kwargs["max_output_tokens"] = max_tokens
+                request_kwargs["text_format"] = response_model
+                request_kwargs["input"] = request_kwargs.pop("messages")
+                response = self.client.responses.parse(**request_kwargs)
                 return self._coerce_structured_response(response.output_parsed, response_model)
             except Exception as structured_error:
                 print(f"Structured OpenAI output failed ({self.model_name}): {structured_error}")
-        request_kwargs = {
-            "model": self.model_name,
-            "messages": messages,
-            "max_completion_tokens": max_tokens,
-        }
-        if "gpt-5" not in self.model_name:
-            request_kwargs["temperature"] = temperature
+                raise
+        
+        request_kwargs["max_completion_tokens"] = max_tokens
         response = self.client.chat.completions.create(**request_kwargs)
         message_content = response.choices[0].message.content
         if isinstance(message_content, list):
             text = "".join(getattr(part, "text", "") for part in message_content)
         else:
             text = message_content or ""
-        if response_model is not None:
-            return self._coerce_structured_response(text, response_model)
         return text
     
     def generate(
@@ -223,45 +228,107 @@ class GeminiWrapper(ModelWrapper):
         prompt: str,
         system_prompt: Optional[str] = None,
         response_model: Optional[Type[BaseModel]] = None,
-        **kwargs
+        **kwargs,
     ) -> Any:
-        temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
-        max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
-        
-        config_kwargs: Dict[str, Any] = {
+        temperature = kwargs.get("temperature", self.config.get("generation", {}).get("temperature", 0.7))
+        max_tokens = kwargs.get("max_tokens", self.config.get("generation", {}).get("max_tokens", 2048))
+
+        config = self._build_gen_config(
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_model=response_model,
+        )
+
+        try:
+            if response_model is None:
+                # plain text path
+                resp = self._call(prompt, config)
+                return self._extract_text_or_raise(resp)
+
+            # structured path (+ optional repair retry)
+            return self._generate_structured_with_optional_repair(
+                prompt=prompt,
+                config=config,
+                response_model=response_model,
+            )
+
+        except Exception as e:
+            print(f"Error calling Gemini API: {e}")
+            raise
+
+    def _build_gen_config(
+        self,
+        *,
+        system_prompt: Optional[str],
+        temperature: float,
+        max_tokens: int,
+        response_model: Optional[Type[BaseModel]],
+    ) -> genai.types.GenerateContentConfig:
+        cfg: Dict[str, Any] = {
             "system_instruction": system_prompt,
             "temperature": temperature,
             "max_output_tokens": max_tokens,
             "safety_settings": self.safety_settings,
         }
         if response_model is not None:
-            config_kwargs["response_mime_type"] = "application/json"
-            config_kwargs["response_json_schema"] = response_model.model_json_schema()
-        config = genai.types.GenerateContentConfig(**config_kwargs)
-        prompt_text = prompt
-        
+            cfg["response_mime_type"] = "application/json"
+            # Pydantic v2: model_json_schema()
+            cfg["response_json_schema"] = response_model.model_json_schema()
+        return genai.types.GenerateContentConfig(**cfg)
+
+    def _call(self, prompt: str, config: genai.types.GenerateContentConfig):
+        return self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config=config,
+        )
+
+    def _extract_text_or_raise(self, response) -> str:
+        text = getattr(response, "text", None)
+        if text:
+            return text
+
+        # fallback: first candidate part
+        candidates = getattr(response, "candidates", None)
+        if candidates and candidates[0].content.parts:
+            part_text = getattr(candidates[0].content.parts[0], "text", None)
+            if part_text:
+                return part_text
+
+        finish_reason = (
+            candidates[0].finish_reason
+            if candidates
+            else "No candidates"
+        )
+        raise ValueError(f"Empty response. Finish reason: {finish_reason}")
+
+    def _generate_structured_with_optional_repair(
+        self,
+        *,
+        prompt: str,
+        config: genai.types.GenerateContentConfig,
+        response_model: Type[BaseModel],
+    ) -> Any:
+        # Attempt 1: normal
+        resp = self._call(prompt, config)
+        text = self._extract_text_or_raise(resp)
+
         try:
-            response = self.client.models.generate_content(
-                model=self.model_name, contents=prompt_text, config=config
-            )
-            text_output = None
-            if hasattr(response, "text") and response.text:
-                text_output = response.text
-            elif hasattr(response, "candidates") and response.candidates and response.candidates[0].content.parts:
-                text_output = response.candidates[0].content.parts[0].text
-            if not text_output:
-                finish_reason = (
-                    response.candidates[0].finish_reason
-                    if hasattr(response, "candidates") and response.candidates
-                    else 'No candidates'
-                )
-                raise ValueError(f"Empty response. Finish reason: {finish_reason}")
-            if response_model is not None:
-                return self._coerce_structured_response(text_output, response_model)
-            return text_output
-        except Exception as e:
-            print(f"Error calling Gemini API: {e}")
-            raise
+            return self._coerce_structured_response(text, response_model)
+        except Exception:
+            # Only do the repair retry for flash models (your current behavior)
+            if "flash" not in self.model_name:
+                raise
+
+        # Attempt 2: repair retry
+        repair_prompt = (
+            "Your previous output was invalid or did not match the schema. "
+            "Return ONLY the JSON object that matches the schema. No extra text."
+        )
+        resp2 = self._call(repair_prompt + "\n\n" + prompt, config)
+        text2 = self._extract_text_or_raise(resp2)
+        return self._coerce_structured_response(text2, response_model)
 
 
 class OpenRouterWrapper(ModelWrapper):

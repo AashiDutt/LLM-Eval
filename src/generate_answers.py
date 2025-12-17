@@ -1,10 +1,18 @@
 import argparse
-from tqdm import tqdm
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
-from .utils import load_config, load_prompts, save_json, generate_timestamp
-from .models import ModelFactory
+from tqdm import tqdm
+
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.utils import load_config, load_prompts, save_json, generate_timestamp
+from src.models import ModelFactory
 
 print_lock = threading.Lock()
 

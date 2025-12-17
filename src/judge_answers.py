@@ -1,14 +1,22 @@
 import argparse
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm import tqdm
+from pathlib import Path
+from typing import Literal, Annotated
 from pydantic import BaseModel, Field
+from tqdm import tqdm
 
-from .utils import (
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.utils import (
     load_config, load_json, save_json, generate_timestamp,
     anonymize_and_shuffle, format_judge_prompt, extract_json_from_response
 )
-from .models import ModelFactory, ModelWrapper
+from src.models import ModelFactory, ModelWrapper
 
 print_lock = threading.Lock()
 
@@ -21,16 +29,29 @@ TEMPERATURE_MAP = {
     "gemini-3-pro-preview": 1.0
 }
 
+Label = Literal["A", "B", "C", "D", "E", "F"]
+Score = Annotated[int, Field(ge=0, le=10)]
+
+class ScoresSchema(BaseModel):
+    A: Score
+    B: Score
+    C: Score
+    D: Score
+    E: Score
+    F: Score
+
 class JudgmentSchema(BaseModel):
-    ranking: list[str] = Field(
-        ..., description="Ordered list of anonymized answer labels from best to worst."
+    ranking: list[Label] = Field(
+        ..., description="Ordered list of anonymized answer labels from best to worst.",
+        min_length=2, max_length=6
     )
-    scores: dict[str, int] = Field(
+    scores: ScoresSchema = Field(
         ..., description="Dictionary mapping each label to an integer score between 0 and 10."
     )
     justification: str = Field(
         ..., description="Short explanation referencing concrete qualities that justify the ranking."
     )
+
 
 
 def thread_safe_print(*args, **kwargs):
