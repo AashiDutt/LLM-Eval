@@ -23,9 +23,9 @@ print_lock = threading.Lock()
 TEMPERATURE_MAP = {
     "claude-haiku-4-5": 0.5,
     "claude-sonnet-4-5": 0.5,
-    "google/gemini-2.5-flash": 0.5,
+    "google/gemini-2.5-flash": 0.3,
     "google/gemini-3-pro-preview": 1.0,
-    "gemini-2.5-flash": 0.5,
+    "gemini-2.5-flash": 0.3,
     "gemini-3-pro-preview": 1.0
 }
 
