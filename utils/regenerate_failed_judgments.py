@@ -171,10 +171,11 @@ def main() -> None:
 
     pbar = tqdm(total=len(tasks), desc="Regenerating judgments")
 
+    ordered_results: List[Optional[Dict[str, Any]]] = [None] * len(tasks)
+
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        future_to_task = {}
-        for task in tasks:
-            future = executor.submit(
+        future_to_index = {
+            executor.submit(
                 run_with_retries,
                 task,
                 get_model,
@@ -182,16 +183,17 @@ def main() -> None:
                 args.verbose,
                 args.retries,
                 args.retry_delay,
-            )
-            future_to_task[future] = task
+            ): idx
+            for idx, task in enumerate(tasks)
+        }
 
-        for future in as_completed(future_to_task):
-            task = future_to_task[future]
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
+            task = tasks[idx]
             try:
-                new_judgment = future.result()
-                judgments[task["index"]] = new_judgment
+                ordered_results[idx] = future.result()
             except Exception as e:
-                judgments[task["index"]] = {
+                ordered_results[idx] = {
                     "prompt_id": task["prompt_id"],
                     "judge_model": task["judge_key"],
                     "error": f"Regeneration failed: {e}",
@@ -200,6 +202,10 @@ def main() -> None:
                 pbar.update(1)
 
     pbar.close()
+
+    for idx, task in enumerate(tasks):
+        if ordered_results[idx] is not None:
+            judgments[task["index"]] = ordered_results[idx]
 
     if skipped:
         print(f"Skipped {skipped} entries due to missing data.")
