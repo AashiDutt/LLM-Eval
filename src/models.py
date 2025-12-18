@@ -29,7 +29,6 @@ class ModelWrapper:
         payload: Any,
         response_model: Optional[Type[BaseModel]],
     ) -> str:
-        print(f"{payload=}")
         if response_model is None:
             return payload if isinstance(payload, str) else str(payload)
 
@@ -322,14 +321,14 @@ class GeminiWrapper(ModelWrapper):
             if "flash" not in self.model_name:
                 raise
 
-        # Attempt 2: repair retry
-        repair_prompt = (
-            "Your previous output was invalid or did not match the schema. "
-            "Return ONLY the JSON object that matches the schema. No extra text."
-        )
-        resp2 = self._call(repair_prompt + "\n\n" + prompt, config)
-        text2 = self._extract_text_or_raise(resp2)
-        return self._coerce_structured_response(text2, response_model)
+            # Attempt 2: repair retry
+            repair_prompt = (
+                "Your previous output was invalid or did not match the schema. "
+                "Return ONLY the JSON object that matches the schema. No extra text."
+            )
+            resp2 = self._call(repair_prompt + "\n\n" + prompt, config)
+            text2 = self._extract_text_or_raise(resp2)
+            return self._coerce_structured_response(text2, response_model)
 
 
 class OpenRouterWrapper(ModelWrapper):
