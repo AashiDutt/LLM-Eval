@@ -13,7 +13,7 @@
 - **Answers**: Anonymized (A, B, C, D, E, F)
 - **Prompts**: 80 MT-Bench style prompts
 - **Hinting**: None (blind evaluation)
-- **Total Judgments**: 2,879
+- **Judgments**: 480 (80 prompts × 6 judges)
 
 ## Categories (10 prompts each)
 
