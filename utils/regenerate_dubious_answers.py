@@ -2,14 +2,14 @@
 """
 Regenerate dubious answers (empty strings or API failures) in answers.json.
 
-The script reuses the `generate_answer` helper from `src/generate_answers.py`
+The script reuses the `generate_answer` helper from `utils/generate_answers.py`
 to keep retry behavior identical to the main generation pipeline.
 """
 from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 from tqdm import tqdm
 
@@ -23,15 +23,9 @@ from src.utils import load_config, load_json, save_json
 from src.models import ModelFactory
 from src.generate_answers import generate_answer  # type: ignore
 
-DUBIOUS_MARKER = "[ERROR: Failed to generate answer"
-
-
-def is_dubious(answer_text: str) -> bool:
-    return not answer_text or DUBIOUS_MARKER in answer_text
-
 
 def regenerate_entry(model, prompt_text: str, retries: int) -> str:
-    return generate_answer(model, prompt_text, retries=retries)
+    return generate_answer(model, prompt_text, retries=retries, retry_delay=45)
 
 
 def main() -> None:
@@ -71,7 +65,7 @@ def main() -> None:
     answers: List[Dict[str, Any]] = load_json(args.answers)
 
     dubious_indices = [
-        idx for idx, answer in enumerate(answers) if is_dubious(answer.get("answer_text", ""))
+        idx for idx, answer in enumerate(answers) if "error" in answer and answer.get("error", "")
     ]
 
     if not dubious_indices:
@@ -111,34 +105,48 @@ def main() -> None:
 
     pbar = tqdm(total=len(tasks), desc="Regenerating answers")
     failures = 0
+    ordered_outputs: List[Optional[str]] = [None] * len(tasks)
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        future_to_task = {
+        future_to_index = {
             executor.submit(
                 regenerate_entry,
                 task["model"],
                 task["prompt_text"],
                 args.retries,
-            ): task
-            for task in tasks
+            ): idx
+            for idx, task in enumerate(tasks)
         }
 
-        for future in as_completed(future_to_task):
-            task = future_to_task[future]
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
             try:
-                new_answer = future.result()
-                if isinstance(new_answer, dict) and "error" in new_answer:
-                    failures += 1
-                    answers[task["index"]]["answer_text"] = f"[ERROR: Failed to regenerate answer - {new_answer['error']}]"
-                else:
-                    answers[task["index"]]["answer_text"] = new_answer
+                ordered_outputs[idx] = future.result()
             except Exception as e:
+                ordered_outputs[idx] = f"[ERROR: Failed to regenerate answer - {e}]"
                 failures += 1
-                answers[task["index"]]["answer_text"] = f"[ERROR: Failed to regenerate answer - {e}]"
             finally:
                 pbar.update(1)
 
     pbar.close()
+
+    for idx, task in enumerate(tasks):
+        new_answer = ordered_outputs[idx]
+        if new_answer is None:
+            failures += 1
+            if "answer_text" in answers[task["index"]]:
+                del answers[task["index"]]["answer_text"]
+            # answers[task["index"]]["answer_text"] = "[ERROR: Failed to regenerate answer - Unknown error]"
+            # continue
+        elif isinstance(new_answer, dict) and "error" in new_answer:
+            failures += 1
+            if "answer_text" in answers[task["index"]]:
+                del answers[task["index"]]["answer_text"]
+            # answers[task["index"]]["answer_text"] = f"[ERROR: Failed to regenerate answer - {new_answer['error']}]"
+        else:
+            answers[task["index"]]["answer_text"] = new_answer
+            if "error" in answers[task["index"]]:
+                del answers[task["index"]]["error"]
 
     if failures:
         print(f"⚠ Failed to regenerate {failures} answers. See updated JSON for details.")

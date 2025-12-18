@@ -9,6 +9,7 @@ re-evaluates them with only the judge model responsible for the failure.
 from __future__ import annotations
 
 import argparse
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple, Callable
 
@@ -38,6 +39,7 @@ def run_with_retries(
     shuffle_seed: int,
     verbose: bool,
     retries: int,
+    retry_delay: float,
 ):
     last_exc: Optional[Exception] = None
     for attempt in range(retries):
@@ -54,6 +56,8 @@ def run_with_retries(
             )
         except Exception as exc:
             last_exc = exc
+            if attempt < retries - 1:
+                time.sleep(retry_delay)
     raise RuntimeError(f"Failed after {retries} attempts: {last_exc}")
 
 
@@ -94,6 +98,12 @@ def main() -> None:
         type=int,
         default=4,
         help="How many times to retry a failed judgment before giving up (default: 1).",
+    )
+    parser.add_argument(
+        "--retry-delay",
+        type=float,
+        default=1.0,
+        help="Seconds to wait between retry attempts (default: 1.0).",
     )
     args = parser.parse_args()
 
@@ -161,26 +171,29 @@ def main() -> None:
 
     pbar = tqdm(total=len(tasks), desc="Regenerating judgments")
 
+    ordered_results: List[Optional[Dict[str, Any]]] = [None] * len(tasks)
+
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
-        future_to_task = {}
-        for task in tasks:
-            future = executor.submit(
+        future_to_index = {
+            executor.submit(
                 run_with_retries,
                 task,
                 get_model,
                 shuffle_seed,
                 args.verbose,
                 args.retries,
-            )
-            future_to_task[future] = task
+                args.retry_delay,
+            ): idx
+            for idx, task in enumerate(tasks)
+        }
 
-        for future in as_completed(future_to_task):
-            task = future_to_task[future]
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
+            task = tasks[idx]
             try:
-                new_judgment = future.result()
-                judgments[task["index"]] = new_judgment
+                ordered_results[idx] = future.result()
             except Exception as e:
-                judgments[task["index"]] = {
+                ordered_results[idx] = {
                     "prompt_id": task["prompt_id"],
                     "judge_model": task["judge_key"],
                     "error": f"Regeneration failed: {e}",
@@ -189,6 +202,10 @@ def main() -> None:
                 pbar.update(1)
 
     pbar.close()
+
+    for idx, task in enumerate(tasks):
+        if ordered_results[idx] is not None:
+            judgments[task["index"]] = ordered_results[idx]
 
     if skipped:
         print(f"Skipped {skipped} entries due to missing data.")
