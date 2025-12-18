@@ -270,10 +270,11 @@ class GeminiWrapper(ModelWrapper):
             "temperature": temperature,
             "max_output_tokens": max_tokens,
             "safety_settings": self.safety_settings,
+            # Uncomment to see magic ✨
+            # "thinking_config": {"return_thoughts": True, "thinking_budget": 0}
         }
         if response_model is not None:
             cfg["response_mime_type"] = "application/json"
-            # Pydantic v2: model_json_schema()
             cfg["response_json_schema"] = response_model.model_json_schema()
         return genai.types.GenerateContentConfig(**cfg)
 

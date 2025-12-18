@@ -23,12 +23,6 @@ from src.utils import load_config, load_json, save_json
 from src.models import ModelFactory
 from src.generate_answers import generate_answer  # type: ignore
 
-DUBIOUS_MARKER = "[ERROR: Failed to generate answer"
-
-
-def is_dubious(answer_text: str) -> bool:
-    return not answer_text or DUBIOUS_MARKER in answer_text
-
 
 def regenerate_entry(model, prompt_text: str, retries: int) -> str:
     return generate_answer(model, prompt_text, retries=retries, retry_delay=45)
@@ -140,13 +134,19 @@ def main() -> None:
         new_answer = ordered_outputs[idx]
         if new_answer is None:
             failures += 1
-            answers[task["index"]]["answer_text"] = "[ERROR: Failed to regenerate answer - Unknown error]"
-            continue
-        if isinstance(new_answer, dict) and "error" in new_answer:
+            if "answer_text" in answers[task["index"]]:
+                del answers[task["index"]]["answer_text"]
+            # answers[task["index"]]["answer_text"] = "[ERROR: Failed to regenerate answer - Unknown error]"
+            # continue
+        elif isinstance(new_answer, dict) and "error" in new_answer:
             failures += 1
-            answers[task["index"]]["answer_text"] = f"[ERROR: Failed to regenerate answer - {new_answer['error']}]"
+            if "answer_text" in answers[task["index"]]:
+                del answers[task["index"]]["answer_text"]
+            # answers[task["index"]]["answer_text"] = f"[ERROR: Failed to regenerate answer - {new_answer['error']}]"
         else:
             answers[task["index"]]["answer_text"] = new_answer
+            if "error" in answers[task["index"]]:
+                del answers[task["index"]]["error"]
 
     if failures:
         print(f"⚠ Failed to regenerate {failures} answers. See updated JSON for details.")
