@@ -78,11 +78,11 @@ def judge_prompt_answers(
     
     try:
         model_id = judge_model.model_name
-        is_openai = "gpt" in model_id
         generate_kwargs = {
             "prompt": judge_prompt, "system_prompt": system_prompt, "response_model": JudgmentSchema
         }
-        if not is_openai:
+        # For OpenAI gpt-5 models, temperature is ignored from the corresponding wrapper.
+        if "gpt" not in model_id:
             generate_kwargs.update({"temperature": TEMPERATURE_MAP[model_id]})
         response = judge_model.generate(**generate_kwargs)
         
