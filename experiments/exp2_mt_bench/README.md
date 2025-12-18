@@ -7,7 +7,9 @@
 - **Source**: [LMSYS FastChat](https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge/data/mt_bench)
 - **Paper**: "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (Zheng et al., 2023)
 - **Prompts**: 80 official MT-Bench questions (first turn only)
-- **Data**: [HuggingFace Dataset](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench)
+- **Obtained Data**:
+  * [Answers](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/answers_new.json)
+  * [Judgments](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/judgments_new.json)
 
 ## Setup
 - **Answers**: Anonymized (A, B, C, D, E, F)
@@ -96,11 +98,12 @@
 | Gemini | 48.0% | **52.0%** |
 | GPT | 26.5% | **73.5%** |
 
-*All vendors' Thinking tier models preferred over Fast tier*
+> [!NOTE]
+> All vendors' Thinking tier models preferred over Fast tier*
 
 ---
 
-## Key Findings
+## Key Findings 🔎
 
 1. **GPT shows STRONG self-preference bias**
    - 70% top-1 rate for own answers (expected: 33%)
@@ -156,6 +159,8 @@ python src/judge_answers.py \
 # Step 3: Analyze
 jupyter notebook experiments/exp2_mt_bench/analysis.ipynb
 ```
+
+`src/generate_answers.py` and `src/judge_answers.py` provide a bunch of useful CLI flags to ease debugging. Please run them with `-h` to see them.
 
 ## Data Files
 - `data/answers/answers_mt_bench.json` - 480 model answers
