@@ -1,0 +1,55 @@
+# Configuration for Experiment 3: Hinting Effect
+
+api_keys:
+  anthropic: ${ANTHROPIC_API_KEY}
+  openrouter: ${OPENROUTER_API_KEY} 
+  google: ${GOOGLE_API_KEY}
+
+models:
+  claude:
+    fast: "claude-haiku-4-5"
+    thinking: "claude-sonnet-4-5"
+
+  gpt:
+    fast: "openai/gpt-5-mini"
+    thinking: "openai/gpt-5.2"
+
+  gemini:
+    fast: "google/gemini-2.5-flash"
+    thinking: "google/gemini-3-pro-preview"
+
+judges:
+  primary: "gemini_fast"
+  additional:
+    - "claude_thinking"
+    - "gpt_thinking"
+    - "gemini_thinking"
+    - "claude_fast"
+    - "gpt_fast"
+
+# Hinting Configuration
+# Options: "none", "self", "competitors", "full"
+hinting:
+  mode: "none"  # Override via --hint-mode CLI argument
+
+generation:
+  temperature: 0.7
+  max_tokens: 2048
+  timeout: 60
+
+judging:
+  temperature: 0.3
+  max_tokens: 4096
+  shuffle_seed: 42
+  anonymize: true
+
+statistics:
+  significance_level: 0.05
+  min_prompts_per_test: 10
+
+output:
+  save_intermediate: true
+  verbose: true
+  results_dir: "data/results"
+  timestamp_format: "%Y%m%d_%H%M%S"
+

@@ -25,6 +25,44 @@ class ModelWrapper:
         raise NotImplementedError
 
     @staticmethod
+    def _patch_json_schema_for_openai(schema: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Recursively patch JSON schema for OpenAI/OpenRouter strict mode:
+        - Add additionalProperties: false to all object schemas
+        - Remove description from $ref properties (OpenAI doesn't allow it)
+        """
+        if isinstance(schema, dict):
+            schema = schema.copy()
+            
+            if "$ref" in schema:
+                if "description" in schema:
+                    schema.pop("description")
+            
+            if schema.get("type") == "object" and "additionalProperties" not in schema:
+                schema["additionalProperties"] = False
+            
+            if "$defs" in schema:
+                schema["$defs"] = {
+                    def_name: ModelWrapper._patch_json_schema_for_openai(def_schema)
+                    for def_name, def_schema in schema["$defs"].items()
+                }
+            
+            if "properties" in schema:
+                schema["properties"] = {
+                    prop_name: ModelWrapper._patch_json_schema_for_openai(prop_schema)
+                    for prop_name, prop_schema in schema["properties"].items()
+                }
+            
+            for key, value in schema.items():
+                if key not in ("additionalProperties", "$defs", "properties", "$ref", "description"):
+                    schema[key] = ModelWrapper._patch_json_schema_for_openai(value)
+        
+        elif isinstance(schema, list):
+            schema = [ModelWrapper._patch_json_schema_for_openai(item) for item in schema]
+        
+        return schema
+
+    @staticmethod
     def _coerce_structured_response(
         payload: Any,
         response_model: Optional[Type[BaseModel]],
@@ -185,11 +223,13 @@ class GPTWrapper(ModelWrapper):
                 # GPT-5 models don't support temperature.
                 request_kwargs.update({"temperature": temperature})
             if response_model is not None:
+                raw_schema = response_model.model_json_schema()
+                patched_schema = self._patch_json_schema_for_openai(raw_schema)
                 request_kwargs["response_format"] = {
                     "type": "json_schema",
                     "json_schema": {
                         "name": response_model.__name__,
-                        "schema": response_model.model_json_schema(),
+                        "schema": patched_schema,
                         "strict": True,
                     },
                 }
@@ -353,11 +393,13 @@ class OpenRouterWrapper(ModelWrapper):
         system_message = system_prompt or "You are a helpful assistant. Always respond with valid JSON only, no markdown formatting."
         response_format = None
         if response_model is not None:
+            raw_schema = response_model.model_json_schema()
+            patched_schema = self._patch_json_schema_for_openai(raw_schema)
             response_format = {
                 "type": "json_schema",
                 "json_schema": {
                     "name": response_model.__name__,
-                    "schema": response_model.model_json_schema(),
+                    "schema": patched_schema,
                     "strict": True,
                 },
             }

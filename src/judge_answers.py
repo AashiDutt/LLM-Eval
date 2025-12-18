@@ -67,10 +67,35 @@ def judge_prompt_answers(
     judge_model: ModelWrapper,
     judge_name: str,
     shuffle_seed: int,
-    verbose: bool = False
+    verbose: bool = False,
+    hint_mode: str = "none"
 ) -> dict[str, str]:
     anonymized, mapping = anonymize_and_shuffle(answers, seed=shuffle_seed)
-    system_prompt, judge_prompt = format_judge_prompt(prompt_text, anonymized)
+    
+    label_to_vendor = {}
+    for ans in anonymized:
+        answer_id = mapping[ans['label']]
+        found = False
+        for orig_ans in answers:
+            if orig_ans['answer_id'] == answer_id:
+                label_to_vendor[ans['label']] = orig_ans['model_vendor']
+                found = True
+                break
+        if not found:
+            raise ValueError(f"Could not find answer_id {answer_id} in answers list for label {ans['label']}")
+    
+    if len(label_to_vendor) != len(anonymized):
+        raise ValueError(f"Mapping incomplete: {len(label_to_vendor)}/{len(anonymized)} labels mapped")
+    
+    judge_vendor = judge_name.split('_')[0] if '_' in judge_name else None
+    
+    system_prompt, judge_prompt = format_judge_prompt(
+        prompt_text, 
+        anonymized,
+        hint_mode=hint_mode,
+        judge_vendor=judge_vendor,
+        label_to_vendor=label_to_vendor
+    )
     
     if verbose:
         thread_safe_print(f"  Judge prompt: {len(judge_prompt)} chars")
@@ -134,7 +159,8 @@ def judge_with_retries(
     shuffle_seed: int,
     verbose: bool,
     retries: int,
-    retry_delay: float
+    retry_delay: float,
+    hint_mode: str = "none"
 ) -> dict[str, str]:
     last_result: dict[str, str] | None = None
     for attempt in range(retries):
@@ -145,7 +171,8 @@ def judge_with_retries(
             judge_model=judge_model,
             judge_name=judge_name,
             shuffle_seed=shuffle_seed,
-            verbose=verbose
+            verbose=verbose,
+            hint_mode=hint_mode
         )
         if 'error' not in result:
             return result
@@ -172,7 +199,8 @@ def judge_all_answers(
     verbose: bool = True,
     max_workers: int = 4,
     retries: int = 3,
-    retry_delay: float = 1.0
+    retry_delay: float = 1.0,
+    hint_mode: str = "none"
 ) -> list[dict[str, str]]:
     
     answers_by_prompt = {}
@@ -222,6 +250,9 @@ def judge_all_answers(
     ordered_judgments: list[dict[str, str] | None] = [None] * total_tasks
     pbar = tqdm(total=total_tasks, desc="Judging answers") if verbose else None
     
+    if hint_mode != "none":
+        print(f"Hint mode: {hint_mode}")
+    
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_index = {
             executor.submit(
@@ -234,7 +265,8 @@ def judge_all_answers(
                 shuffle_seed=shuffle_seed,
                 verbose=verbose,
                 retries=retries,
-                retry_delay=retry_delay
+                retry_delay=retry_delay,
+                hint_mode=hint_mode
             ): idx for idx, task in enumerate(tasks)
         }
         
@@ -275,6 +307,9 @@ def main():
     parser.add_argument("--workers", type=int, default=6, help="Number of concurrent judging workers (default: 4)")
     parser.add_argument("--retries", type=int, default=3, help="Number of retries per judgment task (default: 3)")
     parser.add_argument("--retry-delay", type=float, default=1.0, help="Seconds to wait between retries (default: 1.0)")
+    parser.add_argument("--hint-mode", type=str, default=None, 
+                       choices=["none", "self", "competitors", "full"],
+                       help="Hinting mode: none (blind), self (reveal own model), competitors (reveal others), full (reveal all)")
     
     args = parser.parse_args()
     
@@ -292,6 +327,10 @@ def main():
         judges = [primary_judge] + additional_judges
     
     print(f"Using judges: {', '.join(judges)}")
+    
+    hint_mode = args.hint_mode or config.get('hinting', {}).get('mode', 'none')
+    if hint_mode != "none":
+        print(f"Hint mode: {hint_mode}")
     
     if args.limit:
         prompt_ids = list(set(a['prompt_id'] for a in answers))[:args.limit]
@@ -315,7 +354,8 @@ def main():
         verbose=args.verbose,
         max_workers=args.workers,
         retries=args.retries,
-        retry_delay=args.retry_delay
+        retry_delay=args.retry_delay,
+        hint_mode=hint_mode
     )
     
     if args.output is None:
