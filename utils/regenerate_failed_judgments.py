@@ -40,6 +40,7 @@ def run_with_retries(
     verbose: bool,
     retries: int,
     retry_delay: float,
+    hint_mode: str = None
 ):
     last_exc: Optional[Exception] = None
     for attempt in range(retries):
@@ -53,6 +54,7 @@ def run_with_retries(
                 judge_name=task["judge_key"],
                 shuffle_seed=shuffle_seed,
                 verbose=verbose,
+                hint_mode=hint_mode
             )
         except Exception as exc:
             last_exc = exc
@@ -104,6 +106,13 @@ def main() -> None:
         type=float,
         default=1.0,
         help="Seconds to wait between retry attempts (default: 1.0).",
+    )
+    parser.add_argument(
+        "--hint-mode", 
+        type=str, 
+        default=None, 
+        choices=["none", "self", "competitors", "full"],               
+        help="Hinting mode: none (blind), self (reveal own model), competitors (reveal others), full (reveal all)"
     )
     args = parser.parse_args()
 
@@ -183,6 +192,7 @@ def main() -> None:
                 args.verbose,
                 args.retries,
                 args.retry_delay,
+                args.hint_mode,
             ): idx
             for idx, task in enumerate(tasks)
         }

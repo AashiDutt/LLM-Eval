@@ -8,8 +8,8 @@
 - **Paper**: "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (Zheng et al., 2023)
 - **Prompts**: 80 official MT-Bench questions (first turn only)
 - **Obtained Data**:
-  * [Answers](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/answers_new.json)
-  * [Judgments](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/judgments_new.json)
+  * [Answers](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/experiment-2/answers_new.json)
+  * [Judgments](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/experiment-2/judgments_new.json)
 
 ## Setup
 - **Answers**: Anonymized (A, B, C, D, E, F)
@@ -161,11 +161,6 @@ jupyter notebook experiments/exp2_mt_bench/analysis.ipynb
 ```
 
 `src/generate_answers.py` and `src/judge_answers.py` provide a bunch of useful CLI flags to ease debugging. Please run them with `-h` to see them.
-
-## Data Files
-- `data/answers/answers_mt_bench.json` - 480 model answers
-- `data/judgments/judgments_mt_bench.json` - 480 judgments (80 × 6 judges)
-- `data/results/` - Analysis outputs and visualizations
 
 ## Cost Estimate
 - **Full run**: ~$25-30 (480 answer + 480 judge calls)
