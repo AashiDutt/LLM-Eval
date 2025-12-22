@@ -36,10 +36,10 @@ LLM_Eval/
 | # | Experiment | Question | Status |
 |---|------------|----------|--------|
 | 1 | [Blind Judge](experiments/exp1_blind_judge/) | Self-preference with anonymous answers? | ✅ Done |
-| 2 | Benchmark Analysis | Does bias vary by domain? | 🔲 Planned |
-| 3 | Hinting Effect | Does revealing model names matter? | 🔲 Planned |
-| 4 | Fast vs Thinking | Tier preference patterns? | 🔲 Planned |
-| 5 | Family Loyalty | Same-vendor preference? | 🔲 Planned |
+| 2 | Benchmark Analysis | Does bias vary by domain? | ✅ Done |
+| 3 | Hinting Effect | Does revealing model names matter? | ✅ Done|
+| 4 | Fast vs Thinking | Tier preference patterns? | ✅ Done |
+| 5 | Family Loyalty | Same-vendor preference? | ✅ Done |
 
 ## 🚀 Quick Start
 
@@ -92,7 +92,7 @@ Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
 | Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT (OpenRouter) | GPT-5-mini | GPT-4.1 |
+| GPT | GPT-5-mini | GPT-5.2 |
 | Gemini | 2.5 Flash | 3 Pro |
 
 ## 📄 License
