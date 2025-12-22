@@ -14,11 +14,13 @@
 
 ## Data Reuse
 
-| Asset | Source | API Calls |
-|-------|--------|-----------|
-| Answers | `exp2_mt_bench/data/answers/answers_mt_bench.json` | 0 (reused) |
-| Group 4 Judgments | `exp2_mt_bench/data/judgments/judgments_mt_bench.json` | 0 (reused) |
-| Groups 1-3 Judgments | NEW | 1,440 (480 × 3) |
+| Asset | Source | API Calls | Status |
+|-------|--------|-----------|--------|
+| Answers | `exp2_mt_bench/data/answers/answers_mt_bench.json` | 0 (reused) | ✅ Available |
+| Group 2 Judgments | `data/judgments/judgments_group2.json` | 480 | ✅ Available |
+| Group 4 Judgments | `exp2_mt_bench/data/judgments/judgments_mt_bench.json` | 0 (reused) | ✅ Available |
+| Group 1 Judgments | NEW | 480 | ⏳ Pending |
+| Group 3 Judgments | NEW | 480 | ⏳ Pending |
 
 ## Models
 
@@ -112,28 +114,83 @@ python src/judge_answers.py \
 2. **Competitor-hint reduces self-bias**: Knowing competitors but not self leads to fairer evaluation
 3. **Full transparency**: May increase or decrease bias depending on model
 
-## Expected Outputs
+## Available Data
 
-| Output | Description |
-|--------|-------------|
-| `group1_self.json` | Judgments with self-hints |
-| `group2_competitors.json` | Judgments with competitor-hints |
-| `group3_full.json` | Judgments with full hints |
-| `group4_blind.json` | Baseline blind judgments (from exp2) |
-| `analysis.ipynb` | Cross-group comparison |
+| Output | Description | Status |
+|--------|-------------|--------|
+| `judgments_group2.json` | Judgments with competitor-hints | ✅ Available |
+| `judgments_group4.json` | Baseline blind judgments (from exp2) | ✅ Available |
+| `group1_self.json` | Judgments with self-hints | ⏳ Pending |
+| `group3_full.json` | Judgments with full hints | ⏳ Pending |
+| `analysis.ipynb` | Cross-group comparison | ✅ Available |
 
 ## Cost Estimate
 
 - **Groups 1-3**: ~$45 (480 × 3 judge calls)
 - **Quick test**: ~$1
 
-## Comparison Analysis
+## Results (Available Groups Only)
 
-After running all groups, compare:
+**Note**: This analysis includes only Group 2 (Competitors) and Group 4 (Blind) as these are the currently available judgment files.
 
-| Metric | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) |
-|--------|----------------|----------------------|----------------|-----------------|
-| GPT self-preference | ? | ? | ? | 70% (baseline) |
-| Claude self-preference | ? | ? | ? | 32.5% |
-| Gemini self-preference | ? | ? | ? | 31.25% |
+### 1. Self-Bias Detection Summary (Group 2 vs Group 4)
+
+| Vendor | Group 2 (Competitors) | Group 4 (Blind) | Change (pp) | Verdict |
+|--------|----------------------|-----------------|-------------|---------|
+| **Claude** | 36.25% | 30.00% | +6.25 | ✅ **LEAST BIASED** |
+| **Gemini** | 28.12% | 33.12% | -5.00 | ⚠️ Mild bias |
+| **GPT** | 65.62% | 64.38% | +1.25 | ❌ **MOST BIASED** |
+
+*pp = percentage points (arithmetic difference between percentages)*
+
+### 2. Cross-Judge Comparison (Group 2 - Top-1 Selection %)
+
+| Judge | Claude | Gemini | GPT |
+|-------|--------|--------|-----|
+| claude_fast | 32.50 | 13.75 | **53.75** |
+| claude_thinking | 40.00 | 18.75 | **41.25** |
+| gemini_fast | 25.00 | 30.00 | **45.00** |
+| gemini_thinking | 21.25 | 26.25 | **52.50** |
+| gpt_fast | 23.75 | 17.50 | **58.75** |
+| gpt_thinking | 20.00 | 7.50 | **72.50** |
+
+### 3. Self-Bias Change from Baseline
+
+| Vendor | Group 2 Rate | Group 4 Rate | Change (pp) | Effect |
+|--------|--------------|--------------|------------|-------|
+| Claude | 36.25% | 30.00% | +6.25 | ⚠️ Increased bias |
+| GPT | 65.62% | 64.38% | +1.25 | ➡️ No change |
+| Gemini | 28.12% | 33.12% | -5.00 | ➡️ No change |
+
+---
+
+## Key Findings 🔎
+
+1. **Competitors hint has minimal effect on GPT self-bias**
+   - GPT self-preference: 65.62% (Group 2) vs 64.38% (Group 4)
+   - Change: +1.25 percentage points (not significant)
+   - GPT remains highly biased even when competitors are revealed
+
+2. **Claude shows slight increase in self-bias**
+   - Claude self-preference: 36.25% (Group 2) vs 30.00% (Group 4)
+   - Change: +6.25 percentage points
+   - Still remains the least biased judge overall
+
+3. **Gemini shows slight decrease in self-bias**
+   - Gemini self-preference: 28.12% (Group 2) vs 33.12% (Group 4)
+   - Change: -5.00 percentage points
+   - Revealing competitors may help Gemini be more impartial
+
+4. **Overall pattern**: Revealing competitor identities (while hiding own) does not significantly reduce self-bias for highly biased models like GPT
+
+---
+
+## Pending Analysis
+
+The following groups are not yet available and will be analyzed when data becomes available:
+
+- **Group 1 (Self)**: Judges see only their own model revealed
+- **Group 3 (Full)**: All models revealed
+
+Once these groups are available, the analysis will be updated to include all four groups for comprehensive comparison.
 
