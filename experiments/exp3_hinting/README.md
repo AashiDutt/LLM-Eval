@@ -16,9 +16,9 @@
 
 | Asset | Source | API Calls | Status |
 |-------|--------|-----------|--------|
-| Answers | `exp2_mt_bench/data/answers/answers_mt_bench.json` | 0 (reused) | ✅ Available |
-| Group 2 Judgments | `data/judgments/judgments_group2.json` | 480 | ✅ Available |
-| Group 4 Judgments | `exp2_mt_bench/data/judgments/judgments_mt_bench.json` | 0 (reused) | ✅ Available |
+| Answers | `experiments/exp3_hinting/data/answers/answers_mt_bench.json` | 0 (reused) | ✅ Available |
+| Group 2 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group2.json` | 480 | ✅ Available |
+| Group 4 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group4.json` | 0 (reused) | ✅ Available |
 | Group 1 Judgments | NEW | 480 | ⏳ Pending |
 | Group 3 Judgments | NEW | 480 | ⏳ Pending |
 
@@ -28,7 +28,7 @@
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
 | Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT | GPT-5-mini | GPT-5.2 |
+| GPT | GPT-5-mini | o4-mini |
 | Gemini | 2.5 Flash | 3 Pro Preview |
 
 ### Judges
@@ -158,9 +158,9 @@ python src/judge_answers.py \
 
 | Vendor | Group 2 Rate | Group 4 Rate | Change (pp) | Effect |
 |--------|--------------|--------------|------------|-------|
-| Claude | 36.25% | 30.00% | +6.25 | ⚠️ Increased bias |
-| GPT | 65.62% | 64.38% | +1.25 | ➡️ No change |
-| Gemini | 28.12% | 33.12% | -5.00 | ➡️ No change |
+| Claude | 36.25% | 30.00% | +6.25 | ⚠️ Slight increase |
+| GPT | 65.62% | 64.38% | +1.25 | ➡️ Minimal change |
+| Gemini | 28.12% | 33.12% | -5.00 | ✅ Slight decrease |
 
 ---
 
@@ -168,20 +168,23 @@ python src/judge_answers.py \
 
 1. **Competitors hint has minimal effect on GPT self-bias**
    - GPT self-preference: 65.62% (Group 2) vs 64.38% (Group 4)
-   - Change: +1.25 percentage points (not significant)
+   - Change: +1.25 percentage points (minimal change)
    - GPT remains highly biased even when competitors are revealed
+   - The +1.25pp change is negligible, indicating competitors hint does not reduce GPT's strong self-preference
 
 2. **Claude shows slight increase in self-bias**
    - Claude self-preference: 36.25% (Group 2) vs 30.00% (Group 4)
-   - Change: +6.25 percentage points
-   - Still remains the least biased judge overall
+   - Change: +6.25 percentage points (slight increase)
+   - Still remains the least biased judge overall (closest to expected 33.33%)
+   - The increase is modest and Claude maintains relative impartiality
 
 3. **Gemini shows slight decrease in self-bias**
    - Gemini self-preference: 28.12% (Group 2) vs 33.12% (Group 4)
-   - Change: -5.00 percentage points
+   - Change: -5.00 percentage points (slight decrease)
    - Revealing competitors may help Gemini be more impartial
+   - This is the only vendor showing reduced self-bias with competitors hint
 
-4. **Overall pattern**: Revealing competitor identities (while hiding own) does not significantly reduce self-bias for highly biased models like GPT
+4. **Overall pattern**: Revealing competitor identities (while hiding own) does not significantly reduce self-bias for highly biased models like GPT. The effect is minimal across all vendors, suggesting that competitor awareness alone is insufficient to mitigate strong self-preference bias.
 
 ---
 

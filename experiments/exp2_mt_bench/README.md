@@ -36,7 +36,7 @@
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
 | Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT | GPT-5-mini | GPT-5.2 |
+| GPT | GPT-5-mini | o4-mini |
 | Gemini | 2.5 Flash | 3 Pro Preview |
 
 ### Judges (6 total)
@@ -105,27 +105,80 @@
 
 ## Key Findings 🔎
 
-1. **GPT shows STRONG self-preference bias**
-   - 70% top-1 rate for own answers (expected: 33%)
-   - Statistically significant (p < 0.0001)
-   - Bias difference: +36.67 percentage points
+### Overall Self-Bias Patterns
 
-2. **Claude is the most impartial judge**
-   - 32.5% self-preference ≈ expected 33.33%
-   - Actually rates GPT answers highest (50%)
-   - No significant self-bias detected
+1. **GPT judges show the strongest self-preference**
+   - GPT's self-preference is 70% vs an expected baseline of 33.33%, making it the most biased judge family in this run (+36.67 pp).
+   - GPT judge picks GPT answers 70% of the time, while other judges pick GPT answers at 49.75% average.
+   - That's a +20.25 percentage point self-preference gap.
 
-3. **Gemini shows domain-specific preferences**
-   - Strong preference for Math (80%) and Reasoning (70%)
-   - Overall self-bias not statistically significant
+2. **Claude is the least biased**
+   - Claude's self-preference is ~32.5% (close to baseline), showing minimal self-bias.
+   - Claude judge actually rates GPT answers highest (50%), not its own.
+   - This suggests Claude's impartiality rather than self-favoritism.
 
-4. **GPT answers universally preferred**
-   - All 6 judges rank GPT highest (42-70% top-1)
-   - GPT Thinking tier scores highest across the board (8.47/10)
+3. **Gemini shows mild self-bias**
+   - Gemini's self-preference is 31.25%, slightly below expected baseline.
+   - Gemini judge ranks Gemini #1 at 31.25%, while other judges rank Gemini #1 at 19.75% average.
+   - Bias difference: +11.50 percentage points.
 
-5. **Thinking tier > Fast tier consistently**
-   - All vendors' thinking models outperform fast models
-   - GPT thinking shows strongest preference (73.5% of GPT wins)
+4. **GPT answers are selected Top-1 most often across judges**
+   - Across judges, GPT answers are selected Top-1 most often, even by non-GPT judges.
+   - Claude and Gemini judges still pick GPT frequently (50% and 42.5% respectively).
+   - Cross-judge agreement suggests GPT answers may have genuine quality advantages.
+
+5. **Cross-judge agreement as proxy for content quality**
+   - GPT winning under both GPT and non-GPT judges suggests "real" quality rather than just judge favoritism.
+   - However, the +20pp gap between GPT judge and others indicates self-bias is still present.
+
+### Domain-wise Breakdown
+
+#### Self-Bias by Category
+
+| Category | GPT Self-Bias | Claude Self-Bias | Gemini Self-Bias |
+|----------|---------------|------------------|------------------|
+| Writing | **90.0%** | 30.0% | 15.0% |
+| Roleplay | **85.0%** | 30.0% | 45.0% |
+| STEM | **80.0%** | 10.0% | 20.0% |
+| Coding | **75.0%** | 35.0% | 15.0% |
+| Humanities | **70.0%** | 20.0% | 20.0% |
+| Extraction | 55.0% | 40.0% | 10.0% |
+| Math | 35.0% | 35.0% | **80.0%** |
+| Reasoning | 25.0% | 40.0% | **60.0%** |
+
+**Key observations:**
+- GPT shows highest self-bias in Writing (90%) and Roleplay (85%), suggesting stronger bias in creative/subjective domains.
+- Gemini shows strong self-bias in Math (80%) and Reasoning (60%), its core strengths.
+- Claude maintains relatively low self-bias across all domains (10-40%).
+
+#### Cross-Judge GPT Selection by Category
+
+| Category | GPT Judge | Claude Judge | Gemini Judge | Gap |
+|----------|-----------|--------------|--------------|-----|
+| Writing | 90.0% | 70.0% | 50.0% | +40pp |
+| Roleplay | 80.0% | 60.0% | 50.0% | +30pp |
+| STEM | 70.0% | 90.0% | 60.0% | -20pp* |
+| Humanities | 70.0% | 70.0% | 60.0% | +10pp |
+| Coding | 60.0% | 50.0% | 30.0% | +30pp |
+| Extraction | 50.0% | 30.0% | 80.0% | -30pp* |
+| Reasoning | 30.0% | 30.0% | 10.0% | +20pp |
+| Math | 20.0% | 40.0% | 0.0% | +20pp |
+
+*Negative gap indicates GPT judge selects GPT less than other judges (e.g., Claude judge selects GPT more in STEM)
+
+**Domain insights:**
+- GPT self-bias is strongest in Writing and Roleplay (creative tasks).
+- In STEM, Claude judge actually selects GPT more than GPT judge itself (90% vs 70%), suggesting GPT's STEM answers are genuinely strong.
+- In Math, GPT judge shows lower self-bias (20%), likely because Gemini dominates this domain.
+- Cross-judge agreement varies by domain, with Writing showing highest GPT preference across all judges.
+
+### Summary
+
+**Judge choice matters**: Depending on the judge vendor, the "best model" changes dramatically across domains. GPT shows strong self-preference bias (70% vs 33% expected), but GPT answers are also frequently selected by non-GPT judges, suggesting genuine quality advantages in many domains.
+
+**Self-bias varies by domain**: GPT's self-bias is strongest in creative/subjective domains (Writing: 90%, Roleplay: 85%), while Gemini shows strong self-bias in its core strengths (Math: 80%, Reasoning: 60%). Claude maintains relatively impartial judging across all domains.
+
+**Cross-judge agreement indicates quality**: When multiple judges agree on a winner (e.g., GPT in Writing, Gemini in Math), it suggests genuine domain-specific strengths rather than just judge favoritism.
 
 ---
 
