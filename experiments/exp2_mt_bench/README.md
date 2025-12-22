@@ -36,7 +36,7 @@
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
 | Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT | GPT-5-mini | o4-mini |
+| GPT | GPT-5-mini | GPT-5.2 |
 | Gemini | 2.5 Flash | 3 Pro Preview |
 
 ### Judges (6 total)

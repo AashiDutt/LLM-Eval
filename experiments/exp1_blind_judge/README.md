@@ -14,13 +14,13 @@
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
 | Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT | GPT-5-mini | o4-mini |
+| GPT | GPT-5-mini | GPT-5.2 |
 | Gemini | 2.5 Flash | 3 Pro Preview |
 
 ### Judges
 - `gemini_thinking` (Gemini 2.5 Pro)
 - `claude_thinking` (Claude Sonnet 4.5)
-- `gpt_thinking` (o4-mini via OpenRouter)
+- `gpt_thinking` (GPT-5.2 via OpenRouter)
 
 ## Results
 
