@@ -5,7 +5,7 @@ Get your bias evaluation running in **5 minutes**!
 ## Prerequisites
 
 - Python 3.9+
-- API keys for Anthropic, OpenRouter, and Google AI
+- API keys for Anthropic, OpenAI, and Google AI
 
 ## Installation
 
@@ -23,13 +23,13 @@ pip install -r requirements.txt
 Create `.env` file:
 ```bash
 ANTHROPIC_API_KEY=your_anthropic_key_here
-OPENROUTER_API_KEY=your_openrouter_key_here
+OPENAI_API_KEY=your_openai_key_here
 GOOGLE_API_KEY=your_google_key_here
 ```
 
 **Get keys from:**
 - Anthropic: https://console.anthropic.com/
-- OpenRouter: https://openrouter.ai/keys
+- OpenAI: https://openai.com/api/pricing/
 - Google AI: https://aistudio.google.com/app/apikey
 
 ## Run the Pipeline
