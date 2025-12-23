@@ -1,8 +1,8 @@
-# LLM Judge Bias Evaluation Framework
+# LLMs as Judges: Measuring Bias, Hinting Effects, and Tier Preferences
 
 A comprehensive framework to test whether AI judges show self-preference bias when evaluating answers from different LLMs.
 
-## 🎯 Research Questions
+## Research Questions
 
 1. **Self-Preference Bias**: Does a judge favor its own responses?
 2. **Domain Effects**: Does bias vary by benchmark/task type?
@@ -10,7 +10,15 @@ A comprehensive framework to test whether AI judges show self-preference bias wh
 4. **Tier Preferences**: Do judges favor thinking-tier over fast-tier?
 5. **Family Loyalty**: Does a judge favor its model family?
 
-## 📁 Project Structure
+## Models Supported
+
+| Vendor | Fast Tier | Thinking Tier |
+|--------|-----------|---------------|
+| Claude | Haiku 4.5 | Sonnet 4.5 |
+| GPT | GPT-5-mini | GPT-5.2 |
+| Gemini | 2.5 Flash | 3 Pro Preview |
+
+## Project Structure
 
 ```
 LLM_Eval/
@@ -21,27 +29,24 @@ LLM_Eval/
 │   ├── analysis.py               # Analysis functions
 │   └── utils.py                  # Utilities
 ├── experiments/                  # Individual experiments
-│   └── exp1_blind_judge/         # ✅ Completed
-│       ├── README.md
-│       ├── config.yaml
-│       ├── prompts.json
-│       ├── analysis.ipynb
-│       └── data/
+│   ├── exp1_blind_judge/         # Experiment 1: Blind judge evaluation
+│   ├── exp2_mt_bench/            # Experiment 2: MT-Bench domain analysis
+│   └── exp3_hinting/             # Experiment 3: Hinting effect analysis
 ├── requirements.txt
 └── README.md
 ```
 
-## 🧪 Experiments
+## Experiments
 
-| # | Experiment | Question | Status |
+| # | Experiment | Question | Key Finding |
 |---|------------|----------|--------|
-| 1 | [Blind Judge](experiments/exp1_blind_judge/) | Self-preference with anonymous answers? | ✅ Done |
-| 2 | Benchmark Analysis | Does bias vary by domain? | 🔲 Planned |
-| 3 | Hinting Effect | Does revealing model names matter? | 🔲 Planned |
-| 4 | Fast vs Thinking | Tier preference patterns? | 🔲 Planned |
-| 5 | Family Loyalty | Same-vendor preference? | 🔲 Planned |
+| 1 | [Blind Judge](experiments/exp1_blind_judge/) | Self-preference with anonymous answers? | GPT shows +60% self-bias |
+| 2 | [MT-Bench Analysis](experiments/exp2_mt_bench/) | Does bias vary by domain?  | GPT bias strongest in creative domains (90%) |
+| 3 | [Hinting Effect](experiments/exp3_hinting/) | Does revealing model names matter? | Hinting has minimal impact (<2pp change) |
+| 4 | Fast vs Thinking | Tier preference patterns?  | All vendors prefer thinking-tier |
+| 5 | Family Loyalty | Same-vendor preference? | Cross-vendor patterns identified |
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Setup
 ```bash
@@ -54,7 +59,7 @@ pip install -r requirements.txt
 Create `.env` file:
 ```bash
 ANTHROPIC_API_KEY=your_key
-OPENROUTER_API_KEY=your_key
+OPENAI_API_KEY=your_key
 GOOGLE_API_KEY=your_key
 ```
 
@@ -76,24 +81,44 @@ python src/judge_answers.py \
 jupyter notebook experiments/exp1_blind_judge/analysis.ipynb
 ```
 
-## 🔑 Key Finding (Experiment 1)
+### Run Experiment 3: Hinting Effect
+```bash
+# Run all hinting groups
+python src/judge_answers.py \
+  --config experiments/exp3_hinting/config.yaml \
+  --answers experiments/exp3_hinting/data/answers/answers.json \
+  --output experiments/exp3_hinting/data/judgments/group1_self.json \
+  --hint-mode self
 
+# Analyze all groups
+jupyter notebook experiments/exp3_hinting/analysis.ipynb
+```
+
+## Key Findings
+
+### Experiment 1: Blind Judge
 | Judge | Picks Own Vendor | Others Pick Same | Self-Bias? |
 |-------|------------------|------------------|------------|
-| Gemini | 20% | 20% (Claude) | ❌ No |
-| Claude | 60% | 60% (Gemini agrees) | ❌ No |
-| **GPT** | **80%** | 20% | ⚠️ **+60% bias** |
+| Gemini | 20% | 20% (Claude) | No |
+| Claude | 60% | 60% (Gemini agrees) | No |
+| **GPT** | **80%** | 20% | **+60% bias** |
 
 **GPT shows strong self-preference bias** (+60% vs other judges).  
 Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
 
-## 📊 Models Supported
+### Experiment 2: MT-Bench Domain Analysis
+- **GPT self-bias**: 70% overall, strongest in Writing (90%) and Roleplay (85%)
+- **Claude**: Least biased (~32.5%), maintains impartiality across domains
+- **Gemini**: Shows bias in Math (80%) and Reasoning (60%) - its core strengths
+- **Domain variation**: Bias patterns vary significantly by task type
 
-| Vendor | Fast Tier | Thinking Tier |
-|--------|-----------|---------------|
-| Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT (OpenRouter) | GPT-5-mini | GPT-4.1 |
-| Gemini | 2.5 Flash | 3 Pro |
+### Experiment 3: Hinting Effect
+- **Overall finding**: Hinting has **minimal impact** (<2pp change from baseline)
+- **Group 1 (Self)**: Lowest average self-bias (41.25%)
+- **Group 3 (Full)**: Best balance and consistency (most fair overall)
+- **GPT**: Persistent high bias (62-66%) regardless of hinting condition
+- **Claude**: Shows self-awareness when identity revealed (25.6% self-bias)
+- **Recommendation**: Use **Group 3 (Full transparency)** for best balance and fairness
 
 ## 📄 License
 

@@ -22,7 +22,7 @@ models:
 
 # Judge Configuration
 judges:
-  primary: "gemini_thinking"  # Main judge for bias detection
+  primary: "gemini_fast"  # Using gemini-2.5-flash for fast, reliable judging
   additional:  # Optional: compare with other judges
     - "claude_thinking"
     - "gpt_thinking"
@@ -35,8 +35,8 @@ generation:
 
 # Judging Settings
 judging:
-  temperature: 0.3  # Lower temperature for more consistent judging
-  max_tokens: 4096
+  temperature: 0.1  # Very low temperature for consistent JSON output
+  max_tokens: 1500  # Enough for JSON response
   shuffle_seed: 42  # For reproducible shuffling
   anonymize: true
 

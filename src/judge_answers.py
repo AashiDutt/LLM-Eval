@@ -1,39 +1,126 @@
 import argparse
-import json
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Literal, Annotated
+from pydantic import BaseModel, Field
 from tqdm import tqdm
-from typing import List, Dict, Any
 
-from utils import (
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.utils import (
     load_config, load_json, save_json, generate_timestamp,
     anonymize_and_shuffle, format_judge_prompt, extract_json_from_response
 )
-from models import ModelFactory
+from src.models import ModelFactory, ModelWrapper
+
+print_lock = threading.Lock()
+
+TEMPERATURE_MAP = {
+    "claude-haiku-4-5": 0.5,
+    "claude-sonnet-4-5": 0.5,
+    "google/gemini-2.5-flash": 0.3,
+    "google/gemini-3-pro-preview": 1.0,
+    "gemini-2.5-flash": 0.3,
+    "gemini-3-pro-preview": 1.0
+}
+
+Label = Literal["A", "B", "C", "D", "E", "F"]
+Score = Annotated[int, Field(ge=0, le=10)]
+
+class ScoresSchema(BaseModel):
+    A: Score
+    B: Score
+    C: Score
+    D: Score
+    E: Score
+    F: Score
+
+class JudgmentSchema(BaseModel):
+    ranking: list[Label] = Field(
+        ..., description="Ordered list of anonymized answer labels from best to worst.",
+        min_length=2, max_length=6
+    )
+    scores: ScoresSchema = Field(
+        ..., description="Dictionary mapping each label to an integer score between 0 and 10."
+    )
+    justification: str = Field(
+        ..., description="Short explanation referencing concrete qualities that justify the ranking."
+    )
+
+
+
+def thread_safe_print(*args, **kwargs):
+    with print_lock:
+        print(*args, **kwargs)
 
 
 def judge_prompt_answers(
     prompt_id: str,
     prompt_text: str,
-    answers: List[Dict[str, Any]],
-    judge_model,
+    answers: list[dict[str, str]],
+    judge_model: ModelWrapper,
     judge_name: str,
     shuffle_seed: int,
-    verbose: bool = False
-) -> Dict[str, Any]:
+    verbose: bool = False,
+    hint_mode: str = "none"
+) -> dict[str, str]:
     anonymized, mapping = anonymize_and_shuffle(answers, seed=shuffle_seed)
-    judge_prompt = format_judge_prompt(prompt_text, anonymized)
+    
+    label_to_vendor = {}
+    for ans in anonymized:
+        answer_id = mapping[ans['label']]
+        found = False
+        for orig_ans in answers:
+            if orig_ans['answer_id'] == answer_id:
+                label_to_vendor[ans['label']] = orig_ans['model_vendor']
+                found = True
+                break
+        if not found:
+            raise ValueError(f"Could not find answer_id {answer_id} in answers list for label {ans['label']}")
+    
+    if len(label_to_vendor) != len(anonymized):
+        raise ValueError(f"Mapping incomplete: {len(label_to_vendor)}/{len(anonymized)} labels mapped")
+    
+    judge_vendor = judge_name.split('_')[0] if '_' in judge_name else None
+    
+    system_prompt, judge_prompt = format_judge_prompt(
+        prompt_text, 
+        anonymized,
+        hint_mode=hint_mode,
+        judge_vendor=judge_vendor,
+        label_to_vendor=label_to_vendor
+    )
     
     if verbose:
-        print(f"  Judge prompt: {len(judge_prompt)} chars")
-        print(f"  Mapping: {mapping}")
+        thread_safe_print(f"  Judge prompt: {len(judge_prompt)} chars")
+        thread_safe_print(f"  Mapping: {mapping}")
     
     try:
-        response = judge_model.generate(judge_prompt, temperature=0.3)
+        model_id = judge_model.model_name
+        generate_kwargs = {
+            "prompt": judge_prompt, "system_prompt": system_prompt, "response_model": JudgmentSchema
+        }
+        # For OpenAI gpt-5 models, temperature is ignored from the corresponding wrapper.
+        if "gpt" not in model_id:
+            generate_kwargs.update({"temperature": TEMPERATURE_MAP[model_id]})
+        response = judge_model.generate(**generate_kwargs)
         
         if verbose:
-            print(f"  Judge response: {response[:200]}...")
+            preview = response if isinstance(response, str) else str(response)
+            thread_safe_print(f"  Judge response: {preview[:200]}...")
         
-        judgment = extract_json_from_response(response)
+        if isinstance(response, BaseModel):
+            judgment = response.model_dump()
+        elif isinstance(response, dict):
+            judgment = response
+        else:
+            judgment = extract_json_from_response(response)
         
         required_fields = ['ranking', 'scores', 'justification']
         for field in required_fields:
@@ -54,7 +141,7 @@ def judge_prompt_answers(
         return judgment_record
         
     except Exception as e:
-        print(f"  ✗ Error judging {prompt_id} with {judge_name}: {e}")
+        thread_safe_print(f"  ✗ Error judging {prompt_id} with {judge_name}: {e}")
         return {
             "prompt_id": prompt_id,
             "judge_model": judge_name,
@@ -63,15 +150,58 @@ def judge_prompt_answers(
         }
 
 
+def judge_with_retries(
+    prompt_id: str,
+    prompt_text: str,
+    answers: list[dict[str, str]],
+    judge_model: ModelWrapper,
+    judge_name: str,
+    shuffle_seed: int,
+    verbose: bool,
+    retries: int,
+    retry_delay: float,
+    hint_mode: str = "none"
+) -> dict[str, str]:
+    last_result: dict[str, str] | None = None
+    for attempt in range(retries):
+        result = judge_prompt_answers(
+            prompt_id=prompt_id,
+            prompt_text=prompt_text,
+            answers=answers,
+            judge_model=judge_model,
+            judge_name=judge_name,
+            shuffle_seed=shuffle_seed,
+            verbose=verbose,
+            hint_mode=hint_mode
+        )
+        if 'error' not in result:
+            return result
+        last_result = result
+        if attempt < retries - 1:
+            if verbose:
+                thread_safe_print(
+                    f"  Retry {attempt + 1}/{retries} for {judge_name} on {prompt_id}: {result.get('error')}"
+                )
+            time.sleep(retry_delay)
+    return last_result if last_result is not None else {
+        "prompt_id": prompt_id,
+        "judge_model": judge_name,
+        "error": "Unknown error",
+        "mapping": {}
+    }
+
+
 def judge_all_answers(
-    answers: List[Dict[str, Any]],
+    answers: list[dict[str, str]],
     model_factory: ModelFactory,
-    config: Dict[str, Any],
-    judges: List[str],
-    output_dir: str,
-    verbose: bool = True
-) -> List[Dict[str, Any]]:
-    all_judgments = []
+    config: dict[str, str],
+    judges: list[str],
+    verbose: bool = True,
+    max_workers: int = 4,
+    retries: int = 3,
+    retry_delay: float = 1.0,
+    hint_mode: str = "none"
+) -> list[dict[str, str]]:
     
     answers_by_prompt = {}
     for answer in answers:
@@ -89,9 +219,7 @@ def judge_all_answers(
         vendor, tier = judge_key.split('_')
         judge_models[judge_key] = model_factory.get_model(vendor, tier)
     
-    total_tasks = len(answers_by_prompt) * len(judges)
-    pbar = tqdm(total=total_tasks, desc="Judging answers") if verbose else None
-    
+    tasks = []
     for prompt_id, prompt_answers in answers_by_prompt.items():
         prompt_text = prompt_answers[0]['prompt_text']
         category = prompt_answers[0]['category']
@@ -103,34 +231,69 @@ def judge_all_answers(
             print(f"Answers: {len(prompt_answers)}")
         
         for judge_key in judges:
-            judge_model = judge_models[judge_key]
-            
-            if verbose:
-                print(f"  → Judge: {judge_key}...")
-            
-            judgment = judge_prompt_answers(
-                prompt_id=prompt_id,
-                prompt_text=prompt_text,
-                answers=prompt_answers,
-                judge_model=judge_model,
-                judge_name=judge_key,
+            if judge_models[judge_key] is not None:
+                tasks.append({
+                    "prompt_id": prompt_id,
+                    "prompt_text": prompt_text,
+                    "answers": prompt_answers,
+                    "judge_key": judge_key,
+                    "judge_model": judge_models[judge_key]
+                })
+    
+    total_tasks = len(tasks)
+    if verbose:
+        print(f"\nRunning {total_tasks} judgment tasks with {max_workers} concurrent workers...")
+    
+    if total_tasks == 0:
+        return []
+    
+    ordered_judgments: list[dict[str, str] | None] = [None] * total_tasks
+    pbar = tqdm(total=total_tasks, desc="Judging answers") if verbose else None
+    
+    if hint_mode != "none":
+        print(f"Hint mode: {hint_mode}")
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_index = {
+            executor.submit(
+                judge_with_retries,
+                prompt_id=task["prompt_id"],
+                prompt_text=task["prompt_text"],
+                answers=task["answers"],
+                judge_model=task["judge_model"],
+                judge_name=task["judge_key"],
                 shuffle_seed=shuffle_seed,
-                verbose=verbose
-            )
-            
-            all_judgments.append(judgment)
-            
-            if verbose and 'error' not in judgment:
-                top_answer = judgment['mapping'][judgment['ranking'][0]]
-                print(f"  ✓ Top answer: {top_answer}")
-            
-            if pbar:
-                pbar.update(1)
+                verbose=verbose,
+                retries=retries,
+                retry_delay=retry_delay,
+                hint_mode=hint_mode
+            ): idx for idx, task in enumerate(tasks)
+        }
+        
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
+            task = tasks[idx]
+            try:
+                judgment = future.result()
+                ordered_judgments[idx] = judgment
+                
+                if verbose:
+                    if 'error' in judgment:
+                        thread_safe_print(f"  ✗ {task['judge_key']} → {task['prompt_id']}: {judgment['error']}")
+                    else:
+                        top_label = judgment['ranking'][0]
+                        top_answer = judgment['mapping'].get(top_label, top_label)
+                        thread_safe_print(f"  ✓ {task['judge_key']} → {task['prompt_id']} (top: {top_answer})")
+            except Exception as e:
+                thread_safe_print(f"  ✗ {task['judge_key']} → {task['prompt_id']} FAILED: {e}")
+            finally:
+                if pbar:
+                    pbar.update(1)
     
     if pbar:
         pbar.close()
     
-    return all_judgments
+    return [judgment for judgment in ordered_judgments if judgment is not None]
 
 
 def main():
@@ -141,6 +304,12 @@ def main():
     parser.add_argument("--judges", type=str, nargs='+', default=None)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--verbose", action="store_true", default=True)
+    parser.add_argument("--workers", type=int, default=6, help="Number of concurrent judging workers (default: 4)")
+    parser.add_argument("--retries", type=int, default=3, help="Number of retries per judgment task (default: 3)")
+    parser.add_argument("--retry-delay", type=float, default=1.0, help="Seconds to wait between retries (default: 1.0)")
+    parser.add_argument("--hint-mode", type=str, default=None, 
+                       choices=["none", "self", "competitors", "full"],
+                       help="Hinting mode: none (blind), self (reveal own model), competitors (reveal others), full (reveal all)")
     
     args = parser.parse_args()
     
@@ -158,6 +327,10 @@ def main():
         judges = [primary_judge] + additional_judges
     
     print(f"Using judges: {', '.join(judges)}")
+    
+    hint_mode = args.hint_mode or config.get('hinting', {}).get('mode', 'none')
+    if hint_mode != "none":
+        print(f"Hint mode: {hint_mode}")
     
     if args.limit:
         prompt_ids = list(set(a['prompt_id'] for a in answers))[:args.limit]
@@ -178,8 +351,11 @@ def main():
         model_factory=model_factory,
         config=config,
         judges=judges,
-        output_dir="data/judgments",
-        verbose=args.verbose
+        verbose=args.verbose,
+        max_workers=args.workers,
+        retries=args.retries,
+        retry_delay=args.retry_delay,
+        hint_mode=hint_mode
     )
     
     if args.output is None:

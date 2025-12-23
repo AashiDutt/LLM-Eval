@@ -1,0 +1,220 @@
+# Experiment 2: MT-Bench Blind Judge Evaluation
+
+## Research Question
+> **Does judge bias vary across different domains/task types?**
+
+## Benchmark: MT-Bench (Official)
+- **Source**: [LMSYS FastChat](https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge/data/mt_bench)
+- **Paper**: "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (Zheng et al., 2023)
+- **Prompts**: 80 official MT-Bench questions (first turn only)
+- **Obtained Data**:
+  * [Answers](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/experiment-2/answers_new.json)
+  * [Judgments](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/experiment-2/judgments_new.json)
+
+## Setup
+- **Answers**: Anonymized (A, B, C, D, E, F)
+- **Prompts**: 80 MT-Bench style prompts
+- **Hinting**: None (blind evaluation)
+- **Judgments**: 480 (80 prompts × 6 judges)
+
+## Categories (10 prompts each)
+
+| Category | Domain | Example Task |
+|----------|--------|--------------|
+| Writing | Creative | Persuasive emails, stories, poems |
+| Roleplay | Character | Acting as different personas |
+| Reasoning | Logic | Puzzles, brain teasers |
+| Math | Quantitative | Calculations, proofs |
+| Coding | Technical | Algorithms, data structures |
+| Extraction | Information | Parsing text, NER |
+| STEM | Science | Explanations, concepts |
+| Humanities | Liberal Arts | Philosophy, history, ethics |
+
+## Models
+
+### Answer Generators
+| Vendor | Fast Tier | Thinking Tier |
+|--------|-----------|---------------|
+| Claude | Haiku 4.5 | Sonnet 4.5 |
+| GPT | GPT-5-mini | GPT-5.2 |
+| Gemini | 2.5 Flash | 3 Pro Preview |
+
+### Judges (6 total)
+- `claude_fast`, `claude_thinking`
+- `gpt_fast`, `gpt_thinking`
+- `gemini_fast`, `gemini_thinking`
+
+---
+
+## Results
+
+### 1. Self-Bias Detection Summary
+
+| Judge | Self-Preference | Expected | Bias (pp) | Verdict |
+|-------|-----------------|----------|-----------|---------|
+| **Claude** | 32.50% | 33.33% | +8.75 | ✅ **LEAST BIASED** |
+| **Gemini** | 31.25% | 33.33% | +11.50 | ⚠️ Mild bias |
+| **GPT** | 70.00% | 33.33% | +36.67 | ❌ **MOST BIASED** |
+
+*pp = percentage points (arithmetic difference between percentages)*
+
+### 2. Cross-Judge Comparison (Top-1 Selection %)
+
+| Judge | Claude | Gemini | GPT |
+|-------|--------|--------|-----|
+| claude_fast | 27.50 | 17.50 | **55.00** |
+| claude_thinking | 32.50 | 17.50 | **50.00** |
+| gemini_fast | 22.50 | **35.00** | 42.50 |
+| gemini_thinking | 26.25 | **31.25** | 42.50 |
+| gpt_fast | 21.25 | 20.00 | **58.75** |
+| gpt_thinking | 21.25 | 8.75 | **70.00** |
+
+### 3. Average Scores by Vendor & Tier (Gemini Judge)
+
+| Vendor | Fast Tier | Thinking Tier |
+|--------|-----------|---------------|
+| Claude | 7.30 ± 2.23 | 7.96 ± 1.84 |
+| Gemini | 6.01 ± 3.41 | 7.55 ± 2.75 |
+| GPT | 7.05 ± 3.26 | **8.47 ± 2.21** |
+
+### 4. Category-wise Preferences (Gemini Judge)
+
+| Category | Claude | Gemini | GPT | Winner |
+|----------|--------|--------|-----|--------|
+| Coding | 30% | 10% | **60%** | GPT |
+| Extraction | **60%** | 10% | 30% | Claude |
+| Humanities | 20% | 20% | **60%** | GPT |
+| Math | 20% | **80%** | 0% | Gemini |
+| Reasoning | 20% | **70%** | 10% | Gemini |
+| Roleplay | 0% | 40% | **60%** | GPT |
+| STEM | 30% | 0% | **70%** | GPT |
+| Writing | 30% | 20% | **50%** | GPT |
+
+### 5. Tier Preference (Thinking vs Fast)
+
+| Vendor | Fast Tier | Thinking Tier |
+|--------|-----------|---------------|
+| Claude | 38.1% | **61.9%** |
+| Gemini | 48.0% | **52.0%** |
+| GPT | 26.5% | **73.5%** |
+
+> [!NOTE]
+> All vendors' Thinking tier models preferred over Fast tier*
+
+---
+
+## Key Findings 🔎
+
+### Overall Self-Bias Patterns
+
+1. **GPT judges show the strongest self-preference**
+   - GPT's self-preference is 70% vs an expected baseline of 33.33%, making it the most biased judge family in this run (+36.67 pp).
+   - GPT judge picks GPT answers 70% of the time, while other judges pick GPT answers at 49.75% average.
+   - That's a +20.25 percentage point self-preference gap.
+
+2. **Claude is the least biased**
+   - Claude's self-preference is ~32.5% (close to baseline), showing minimal self-bias.
+   - Claude judge actually rates GPT answers highest (50%), not its own.
+   - This suggests Claude's impartiality rather than self-favoritism.
+
+3. **Gemini shows mild self-bias**
+   - Gemini's self-preference is 31.25%, slightly below expected baseline.
+   - Gemini judge ranks Gemini #1 at 31.25%, while other judges rank Gemini #1 at 19.75% average.
+   - Bias difference: +11.50 percentage points.
+
+4. **GPT answers are selected Top-1 most often across judges**
+   - Across judges, GPT answers are selected Top-1 most often, even by non-GPT judges.
+   - Claude and Gemini judges still pick GPT frequently (50% and 42.5% respectively).
+   - Cross-judge agreement suggests GPT answers may have genuine quality advantages.
+
+5. **Cross-judge agreement as proxy for content quality**
+   - GPT winning under both GPT and non-GPT judges suggests "real" quality rather than just judge favoritism.
+   - However, the +20pp gap between GPT judge and others indicates self-bias is still present.
+
+### Domain-wise Breakdown
+
+#### Self-Bias by Category
+
+| Category | GPT Self-Bias | Claude Self-Bias | Gemini Self-Bias |
+|----------|---------------|------------------|------------------|
+| Writing | **90.0%** | 30.0% | 15.0% |
+| Roleplay | **85.0%** | 30.0% | 45.0% |
+| STEM | **80.0%** | 10.0% | 20.0% |
+| Coding | **75.0%** | 35.0% | 15.0% |
+| Humanities | **70.0%** | 20.0% | 20.0% |
+| Extraction | 55.0% | 40.0% | 10.0% |
+| Math | 35.0% | 35.0% | **80.0%** |
+| Reasoning | 25.0% | 40.0% | **60.0%** |
+
+**Key observations:**
+- GPT shows highest self-bias in Writing (90%) and Roleplay (85%), suggesting stronger bias in creative/subjective domains.
+- Gemini shows strong self-bias in Math (80%) and Reasoning (60%), its core strengths.
+- Claude maintains relatively low self-bias across all domains (10-40%).
+
+#### Cross-Judge GPT Selection by Category
+
+| Category | GPT Judge | Claude Judge | Gemini Judge | Gap |
+|----------|-----------|--------------|--------------|-----|
+| Writing | 90.0% | 70.0% | 50.0% | +40pp |
+| Roleplay | 80.0% | 60.0% | 50.0% | +30pp |
+| STEM | 70.0% | 90.0% | 60.0% | -20pp* |
+| Humanities | 70.0% | 70.0% | 60.0% | +10pp |
+| Coding | 60.0% | 50.0% | 30.0% | +30pp |
+| Extraction | 50.0% | 30.0% | 80.0% | -30pp* |
+| Reasoning | 30.0% | 30.0% | 10.0% | +20pp |
+| Math | 20.0% | 40.0% | 0.0% | +20pp |
+
+*Negative gap indicates GPT judge selects GPT less than other judges (e.g., Claude judge selects GPT more in STEM)
+
+**Domain insights:**
+- GPT self-bias is strongest in Writing and Roleplay (creative tasks).
+- In STEM, Claude judge actually selects GPT more than GPT judge itself (90% vs 70%), suggesting GPT's STEM answers are genuinely strong.
+- In Math, GPT judge shows lower self-bias (20%), likely because Gemini dominates this domain.
+- Cross-judge agreement varies by domain, with Writing showing highest GPT preference across all judges.
+
+### Summary
+
+**Judge choice matters**: Depending on the judge vendor, the "best model" changes dramatically across domains. GPT shows strong self-preference bias (70% vs 33% expected), but GPT answers are also frequently selected by non-GPT judges, suggesting genuine quality advantages in many domains.
+
+**Self-bias varies by domain**: GPT's self-bias is strongest in creative/subjective domains (Writing: 90%, Roleplay: 85%), while Gemini shows strong self-bias in its core strengths (Math: 80%, Reasoning: 60%). Claude maintains relatively impartial judging across all domains.
+
+**Cross-judge agreement indicates quality**: When multiple judges agree on a winner (e.g., GPT in Writing, Gemini in Math), it suggests genuine domain-specific strengths rather than just judge favoritism.
+
+---
+
+## Hypotheses Evaluation
+
+| Hypothesis | Result |
+|------------|--------|
+| Bias stronger in subjective domains | ⚠️ Mixed - Gemini biased in Math/Reasoning (objective) |
+| GPT self-bias varies by domain | ✅ Confirmed - GPT bias consistent across domains |
+| Technical tasks show different patterns | ✅ Confirmed - Gemini excels in Math/Reasoning |
+
+---
+
+## How to Run
+
+```bash
+cd /path/to/LLM_Eval
+
+# Step 1: Generate answers (80 prompts × 6 models = 480 API calls)
+python src/generate_answers.py \
+  --config experiments/exp2_mt_bench/config.yaml \
+  --prompts experiments/exp2_mt_bench/prompts.json \
+  --output experiments/exp2_mt_bench/data/answers/answers.json
+
+# Step 2: Judge answers (80 prompts × 6 judges = 480 API calls)
+python src/judge_answers.py \
+  --config experiments/exp2_mt_bench/config.yaml \
+  --answers experiments/exp2_mt_bench/data/answers/answers.json \
+  --output experiments/exp2_mt_bench/data/judgments/judgments.json
+
+# Step 3: Analyze
+jupyter notebook experiments/exp2_mt_bench/analysis.ipynb
+```
+
+`src/generate_answers.py` and `src/judge_answers.py` provide a bunch of useful CLI flags to ease debugging. Please run them with `-h` to see them.
+
+## Cost Estimate
+- **Full run**: ~$25-30 (480 answer + 480 judge calls)
+- **Quick test**: ~$1
