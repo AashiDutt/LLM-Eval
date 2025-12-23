@@ -215,6 +215,28 @@
    - Gemini: 21.9% (closer to expected)
    - **Interpretation**: Full transparency may reduce extreme preferences
 
+### Domain-wise Breakdown: Which Group Performs Best Per Category?
+
+#### Overall Self-Bias by Category (Average Across All Vendors)
+
+| Category | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) | Best Group |
+|----------|----------------|----------------------|----------------|-----------------|------------|
+| Extraction | **31.7%** | 38.3% | 33.3% | 35.0% | **Group 1** |
+| Humanities | **36.7%** | 38.3% | 36.7% | 36.7% | **Group 1** |
+| Math | **46.7%** | 51.7% | 51.7% | 50.0% | **Group 1** |
+| Reasoning | **41.7%** | 43.3% | 41.7% | 41.7% | **Group 1** |
+| Writing | **38.3%** | 43.3% | 38.3% | 45.0% | **Group 1** |
+| Coding | 43.3% | 43.3% | 45.0% | **41.7%** | **Group 4** |
+| Roleplay | 55.0% | 55.0% | 61.7% | **53.3%** | **Group 4** |
+| STEM | 36.7% | **33.3%** | 43.3% | 36.7% | **Group 2** |
+
+*Best = lowest average self-bias across all vendors for that category*
+
+**Key observations:**
+- **Group 1 (Self)** performs best in 5 out of 8 categories (Extraction, Humanities, Math, Reasoning, Writing)
+- **Group 4 (Blind)** performs best in 2 categories (Coding, Roleplay)
+- **Group 2 (Competitors)** performs best in 1 category (STEM)
+- **Group 3 (Full)** never performs best overall, but shows good balance
 ---
 
 ## Hypotheses Evaluation
@@ -251,19 +273,6 @@
    - Recommended for published results
 
 ---
-
-## Recommendations: Which Hinting Mode is Best?
-
-**The answer depends on your goal.** Each hinting mode optimizes for different criteria:
-
-### Goal-Based Recommendations
-
-| Goal | Best Group | Why (Based on Results) | Trade-offs |
-|------|------------|------------------------|------------|
-| **Benchmark Validity / Least Metadata Contamination** | **Group 4 (Blind)** | Most defensible setup: minimizes identity effects by design. Cleanest evaluation protocol for published results. | Slightly higher average self-bias (42.50%) than Group 1 |
-| **Bias Mitigation (Reduce Self-Preference)** | **Group 1 (Self)** | Lowest average self-bias (41.25%) and lowest deviation from expected. Claude shows self-awareness effect (25.6%). | Worse balance (15.50) and consistency (15.57) than Group 3 |
-| **Stable + Balanced Selection Across Vendors** | **Group 3 (Full)** | Best balance score (13.10) and consistency (14.00). Most even vendor distribution. | Highest average self-bias (43.96%) and least blind (most exposed to brand/identity bias) |
-| **Avoid (Tends to Worsen Bias)** | **Group 2 (Competitors)** | Highest bias amplification (43.33%). GPT self-bias peaks here (65.6%). Worst deviation from expected. | Only use if studying bias amplification effects |
 
 ### Practical Bottom Line
 
