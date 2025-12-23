@@ -54,23 +54,11 @@
 | **Group 3** | `full` | All models revealed | Full transparency |
 | **Group 4** | `none` | No hints (blind) | Baseline control |
 
-## Available Data 
-
-| Asset | Source | Description|
-|-------|--------|--------|
-| Answers | `experiments/exp3_hinting/data/answers/answers_mt_bench.json` | Answers from all models |
-| Group 1 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group1.json` | Judgments with self-hints |
-| Group 2 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group2.json` | Judgments with competitor-hints | 
-| Group 3 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group3.json` | Judgments with full hints | 
-| Group 4 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group4.json` | Baseline blind judgments | 
-| All groups analysis |  `experiments/exp3_hinting/analysis.ipynb`| Cross-group comparison |
-
 ## Hypotheses
 
 1. **Self-hint increases self-bias**: Judges favor own model more when they know which answer is theirs
 2. **Competitor-hint reduces self-bias**: Knowing competitors but not self leads to fairer evaluation
 3. **Full transparency**: May increase or decrease bias depending on model
-
 
 ## Results
 
@@ -108,14 +96,29 @@
 *Percentage of times each vendor's answers are ranked #1 overall*
 
 
-### 2. Overall Ranking
+### 2. Ranking by Metric
 
-| Rank | Group | Key Strength |
-|------|-------|--------------|
-| 1 | Group 1 (Self) | Lowest average self-bias (41.25%) |
-| 2 | Group 4 (Blind) | Baseline control |
-| 3 | Group 2 (Competitors) | Moderate performance |
-| 4 | Group 3 (Full) | Best balance & consistency |
+**Ranked by Average Self-Bias (Lower = Better)**
+
+| Rank | Group | Avg Self-Bias | What this means |
+|---:|---|---:|---|
+| 1 | Group 1 (Self-only hint) | 41.25% | Minimizes self-preference the most |
+| 2 | Group 4 (No hints / Blind) | 42.50% | Clean baseline; slightly higher self-bias |
+| 3 | Group 2 (Competitors-only) | 43.33% | Worsens self-bias overall |
+| 4 | Group 3 (Full hints) | 43.96% | Highest self-bias (worst by this metric) |
+
+
+**Ranked by Stability & Balance (Lower balance score + lower winner drift = Better)**
+
+| Rank | Group | Key Strength | Why |
+|---:|---|---|---|
+| 1 | Group 3 (Full hints) | Most stable  | Lowest winner drift; most even selection profile |
+| 2 | Group 4 (No hints / Blind) | Best scientific control | No identity leakage; stable baseline |
+| 3 | Group 1 (Self-only hint) | Bias mitigation | Reduces self-bias but causes larger winner swings |
+| 4 | Group 2 (Competitors-only) | — | Most disruptive; amplifies bias in some judges |
+
+
+**Note**: Rankings differ by metric. See "Recommendations" section for goal-based guidance.
 
 ---
 
@@ -225,26 +228,70 @@
 
 **Key Finding**: None of the hinting modes significantly reduce self-bias. The effect of revealing model identities is minimal (<2pp change), suggesting that **judge bias is robust to hinting interventions**.
 
----
+### Summary
 
-## Recommendations
+1. **Group 1 (Self)**: Best for bias minimization
+   - Lowest average self-bias (41.25%)
+   - Claude shows self-awareness (25.6% self-bias)
+   - Trade-off: Worse balance and consistency
 
-1. **Use Group 3 (Full) - Full Transparency**
+2. **Group 2 (Competitors)**: Worst overall performance
+   - Highest average self-bias (43.33%)
+   - GPT self-bias peaks here (65.6%)
+   - Avoid unless studying bias amplification
+
+3. **Group 3 (Full)**: Best for balance and consistency
    - Best balance score (13.10) and consistency (14.00)
    - Most balanced vendor distribution
-   - Transparent process (all models revealed)
-   - Small trade-off in average self-bias is acceptable for better overall fairness
+   - Trade-off: Highest average self-bias (43.96%) and least blind
 
-2. **Alternative: Use Group 1 (Self) if minimizing self-bias is priority**
-   - Lowest average self-bias (41.25%)
-   - Claude shows self-awareness effect (25.6% self-bias)
-   - However, worse balance and consistency than Group 3
+4. **Group 4 (Blind)**: Best for benchmark validity
+   - Most defensible protocol (minimizes identity effects)
+   - Baseline control (42.50% self-bias)
+   - Recommended for published results
 
-3. **Consider vendor-specific strategies**
-   - Claude: Self-hint may help (25.6% vs 30.0% baseline)
-   - GPT: No hinting mode significantly reduces bias (62-66% across all groups)
-   - Gemini: Competitors hint may help (28.1% vs 33.1% baseline)
+---
 
+## Recommendations: Which Hinting Mode is Best?
+
+**The answer depends on your goal.** Each hinting mode optimizes for different criteria:
+
+### Goal-Based Recommendations
+
+| Goal | Best Group | Why (Based on Results) | Trade-offs |
+|------|------------|------------------------|------------|
+| **Benchmark Validity / Least Metadata Contamination** | **Group 4 (Blind)** | Most defensible setup: minimizes identity effects by design. Cleanest evaluation protocol for published results. | Slightly higher average self-bias (42.50%) than Group 1 |
+| **Bias Mitigation (Reduce Self-Preference)** | **Group 1 (Self)** | Lowest average self-bias (41.25%) and lowest deviation from expected. Claude shows self-awareness effect (25.6%). | Worse balance (15.50) and consistency (15.57) than Group 3 |
+| **Stable + Balanced Selection Across Vendors** | **Group 3 (Full)** | Best balance score (13.10) and consistency (14.00). Most even vendor distribution. | Highest average self-bias (43.96%) and least blind (most exposed to brand/identity bias) |
+| **Avoid (Tends to Worsen Bias)** | **Group 2 (Competitors)** | Highest bias amplification (43.33%). GPT self-bias peaks here (65.6%). Worst deviation from expected. | Only use if studying bias amplification effects |
+
+### Practical Bottom Line
+
+#### For Leaderboard Claims
+- **Primary setting**: Use **Group 4 (Blind)** as the clean protocol
+- **Diagnostics**: Report Group 1 and Group 3 as supplementary analyses
+- **Rationale**: Blind evaluation is the most defensible for benchmark validity
+
+#### For Explicitly Reducing Judge Self-Bias in Production
+- **Best choice**: **Group 1 (Self)** - strongest bias reduction from the data
+- **Rationale**: Lowest average self-bias (41.25%) and Claude shows self-awareness
+
+#### For Maximum Balance and Consistency
+- **Best choice**: **Group 3 (Full)** - most balanced vendor distribution
+- **Trade-off**: Accepts slightly higher self-bias (43.96%) for better overall fairness
+- **Caveat**: Least blind setting - most exposed to brand/identity effects
+
+#### Avoid Group 2 Unless...
+- Only use Group 2 if your purpose is to study bias amplification
+- Group 2 shows highest bias amplification and worst performance metrics
+
+### Vendor-Specific Strategies
+
+- **Claude**: Self-hint helps (25.6% vs 30.0% baseline) - shows self-awareness
+- **GPT**: No hinting mode significantly reduces bias (62-66% across all groups) - persistent high bias
+- **Gemini**: Competitors hint may help (28.1% vs 33.1% baseline) - responsive to hinting
+
+*Note: “33.33%” is a naive uniform baseline (3 vendors). Real-world “unbiased” rates can differ due to answer quality, prompt mix, and judge preference for style.*
 
 ## How to Run All Groups (1-3)
 
