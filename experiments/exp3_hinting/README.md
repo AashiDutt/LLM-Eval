@@ -232,11 +232,12 @@
 
 *Best = lowest average self-bias across all vendors for that category*
 
-**Key observations:**
-- **Group 1 (Self)** performs best in 5 out of 8 categories (Extraction, Humanities, Math, Reasoning, Writing)
-- **Group 4 (Blind)** performs best in 2 categories (Coding, Roleplay)
-- **Group 2 (Competitors)** performs best in 1 category (STEM)
-- **Group 3 (Full)** never performs best overall, but shows good balance
+**Key observations (from self-bias only):**
+- **Group 1 (Self-only hint)** has the lowest self-bias in **5/8 categories**: Extraction, Humanities, Math, Reasoning, Writing.
+- **Group 4 (Blind)** is best for **Coding** and **Roleplay**, suggesting identity-free judging reduces bias in more subjective/creative tasks.
+- **Group 2 (Competitors-only)** is best only in **STEM**, and is otherwise not consistently bias-reducing.
+- **Group 3 (Full hints)** does **not** minimize self-bias in any category in this run.
+
 ---
 
 ## Hypotheses Evaluation
