@@ -5,7 +5,7 @@
 
 ## Setup
 - **Answers**: Anonymized (A, B, C, D, E, F)
-- **Prompts**: 60 mixed prompts across 6 categories
+- **Prompts**: 10 mixed prompts across 6 categories
 - **Hinting**: None (blind evaluation)
 
 ## Models Tested
@@ -18,17 +18,17 @@
 | Gemini | 2.5 Flash | 3 Pro Preview |
 
 ### Judges
-- `gemini_thinking` (Gemini 2.5 Pro)
-- `claude_thinking` (Claude Sonnet 4.5)
-- `gpt_thinking` (GPT-5.2 via OpenRouter)
+- `gemini_fast`, `gemini_thinking`
+- `claude_fast`, `claude_thinking`
+- `gpt_fast`, `gpt_thinking`
 
 ## Results
 
 | Judge | Claude Wins | GPT Wins | Gemini Wins | Self-Bias? |
 |-------|-------------|----------|-------------|------------|
-| Gemini | 60% | 20% | 20% | ❌ No (20% for own) |
-| Claude | 60% | 20% | 20% | ❌ No (others agree) |
-| GPT | 20% | **80%** | 0% | ⚠️ **+60% bias** |
+| Gemini | 60% | 20% | 20% | No (20% for own) |
+| Claude | 60% | 20% | 20% | No (others agree) |
+| GPT | 20% | **80%** | 0% | **+60% bias** |
 
 ## Key Findings
 

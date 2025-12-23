@@ -3,24 +3,33 @@
 ## Research Question
 > **Does revealing model identities change judge behavior?**
 
-## Design: Partial Hinting Control Groups
+## Benchmark: MT-Bench (Official)
+- **Source**: [LMSYS FastChat](https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge/data/mt_bench)
+- **Paper**: "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (Zheng et al., 2023)
+- **Prompts**: 80 official MT-Bench questions (first turn only)
+- **Obtained Data**:
+  * [Answers](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/experiment-2/answers_new.json)
+  * [Judgments](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/tree/main/experiment-3)
 
-| Group | Hint Mode | What Judge Sees | Purpose |
-|-------|-----------|-----------------|---------|
-| **Group 1** | `self` | Only own model revealed | Self-knowledge effect |
-| **Group 2** | `competitors` | Only competitor models revealed | Competitor awareness |
-| **Group 3** | `full` | All models revealed | Full transparency |
-| **Group 4** | `none` | No hints (blind) | Baseline control |
+## Setup
+- **Answers**: Anonymized (A, B, C, D, E, F) - 6 models (2 per vendor × 3 vendors)
+- **Prompts**: 80 MT-Bench style prompts
+- **Hinting**: 4 modes (self, competitors, full, none)
+- **Judgments per group**: 480 (80 prompts × 6 judges)
+- **Total judgments**: 1,920 (480 × 4 groups)
 
-## Data Reuse
+## Categories (10 prompts each)
 
-| Asset | Source | API Calls | Status |
-|-------|--------|-----------|--------|
-| Answers | `experiments/exp3_hinting/data/answers/answers_mt_bench.json` | 0 (reused) | ✅ Available |
-| Group 2 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group2.json` | 480 | ✅ Available |
-| Group 4 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group4.json` | 0 (reused) | ✅ Available |
-| Group 1 Judgments | NEW | 480 | ⏳ Pending |
-| Group 3 Judgments | NEW | 480 | ⏳ Pending |
+| Category | Domain | Example Task |
+|----------|--------|--------------|
+| Writing | Creative | Persuasive emails, stories, poems |
+| Roleplay | Character | Acting as different personas |
+| Reasoning | Logic | Puzzles, brain teasers |
+| Math | Quantitative | Calculations, proofs |
+| Coding | Technical | Algorithms, data structures |
+| Extraction | Information | Parsing text, NER |
+| STEM | Science | Explanations, concepts |
+| Humanities | Liberal Arts | Philosophy, history, ethics |
 
 ## Models
 
@@ -36,9 +45,208 @@
 - `claude_fast`, `claude_thinking`
 - `gpt_fast`, `gpt_thinking`
 
-## How to Run
+## Design: Partial Hinting Control Groups
 
-### Run All Groups (1-3)
+| Group | Hint Mode | What Judge Sees | Purpose |
+|-------|-----------|-----------------|---------|
+| **Group 1** | `self` | Only own model revealed | Self-knowledge effect |
+| **Group 2** | `competitors` | Only competitor models revealed | Competitor awareness |
+| **Group 3** | `full` | All models revealed | Full transparency |
+| **Group 4** | `none` | No hints (blind) | Baseline control |
+
+## Available Data 
+
+| Asset | Source | Description|
+|-------|--------|--------|
+| Answers | `experiments/exp3_hinting/data/answers/answers_mt_bench.json` | Answers from all models |
+| Group 1 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group1.json` | Judgments with self-hints |
+| Group 2 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group2.json` | Judgments with competitor-hints | 
+| Group 3 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group3.json` | Judgments with full hints | 
+| Group 4 Judgments | `experiments/exp3_hinting/data/judgments/judgments_group4.json` | Baseline blind judgments | 
+| All groups analysis |  `experiments/exp3_hinting/analysis.ipynb`| Cross-group comparison |
+
+## Hypotheses
+
+1. **Self-hint increases self-bias**: Judges favor own model more when they know which answer is theirs
+2. **Competitor-hint reduces self-bias**: Knowing competitors but not self leads to fairer evaluation
+3. **Full transparency**: May increase or decrease bias depending on model
+
+
+## Results
+
+### 1. Comprehensive Comparison: All 4 Hinting Groups
+
+#### Main Metrics Comparison
+
+| Metric | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) | Best |
+|--------|----------------|----------------------|----------------|-----------------|------|
+| **Average Self-Bias** | 41.25% | 43.33% | 43.96% | 42.50% | Group 1 |
+| **Deviation from Expected** | 13.06pp | 13.47pp | 10.63pp | 11.53pp | Group 3 |
+| **Balance Score** | 15.50 | 14.96 | 13.10 | 14.07 | Group 3 |
+| **Consistency** | 15.57 | 16.11 | 14.00 | 15.52 | Group 3 |
+
+*Note: Lower values are better for all metrics. Expected self-bias = 33.33% (3 vendors, unbiased)*
+
+#### Vendor-Specific Self-Bias Rates
+
+| Vendor | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) |
+|--------|----------------|----------------------|----------------|-----------------|
+| **Claude** | 25.6% | 36.2% | 34.4% | 30.0% |
+| **GPT** | 62.5% | 65.6% | 63.7% | 64.4% |
+| **Gemini** | 35.6% | 28.1% | 33.8% | 33.1% |
+
+*Self-bias rate = percentage of times a judge ranks their own vendor #1*
+
+#### Top-Vendor Distribution
+
+| Vendor | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) |
+|--------|----------------|----------------------|----------------|-----------------|
+| **Claude** | 23.5% | 27.1% | 26.5% | 25.2% |
+| **GPT** | 55.2% | 54.0% | 51.7% | 53.1% |
+| **Gemini** | 21.2% | 19.0% | 21.9% | 21.7% |
+
+*Percentage of times each vendor's answers are ranked #1 overall*
+
+
+### 2. Overall Ranking
+
+| Rank | Group | Key Strength |
+|------|-------|--------------|
+| 1 | Group 1 (Self) | Lowest average self-bias (41.25%) |
+| 2 | Group 4 (Blind) | Baseline control |
+| 3 | Group 2 (Competitors) | Moderate performance |
+| 4 | Group 3 (Full) | Best balance & consistency |
+
+---
+
+## Key Findings 🔎
+
+### Overall Hinting Effect
+
+1. **Hinting has minimal impact on self-bias**
+   - All hinting modes show minimal change from baseline (<2pp)
+   - Group 1 (Self): -1.25pp from baseline
+   - Group 2 (Competitors): +0.83pp from baseline
+   - Group 3 (Full): +1.46pp from baseline
+   - **Conclusion**: Revealing model identities does not significantly reduce or increase overall self-bias
+
+2. **Group 1 (Self) performs best on average self-bias**
+   - Lowest average self-bias: 41.25% (vs 42.50% baseline)
+   - Claude shows lowest self-bias when their identity is revealed (25.6%)
+   - GPT remains highly biased (62.5%) even when only their identity is revealed
+   - **Insight**: Self-awareness may help Claude be more impartial, but GPT's bias persists
+
+3. **Group 3 (Full) has best balance and consistency**
+   - Best balance score: 13.10 (most balanced vendor distribution)
+   - Best consistency: 14.00 (most consistent across judges)
+   - Lowest deviation from expected: 10.63pp
+   - **Insight**: Full transparency produces the most balanced and consistent judgments, despite slightly higher average self-bias
+
+### Vendor-Specific Patterns
+
+#### Claude: Self-Awareness Effect
+
+- **Group 1 (Self)**: 25.6% self-bias (lowest across all groups)
+- **Group 4 (Blind)**: 30.0% self-bias
+- **Change**: -4.4pp when Claude knows their own identity
+- **Interpretation**: Claude shows **self-awareness** - when they know which answer is theirs, they become more impartial, potentially avoiding self-favoritism
+
+#### GPT: Persistent High Bias
+
+- **Self-bias range**: 62.5% - 65.6% across all groups
+- **Group 1 (Self)**: 62.5% (lowest, but still very high)
+- **Group 2 (Competitors)**: 65.6% (highest)
+- **Change from baseline**: Minimal (<2pp)
+- **Interpretation**: GPT shows **systematic high self-bias** regardless of hinting condition. No hinting mode significantly reduces GPT's strong self-preference.
+
+#### Gemini: Moderate and Variable
+
+- **Self-bias range**: 28.1% - 35.6% across all groups
+- **Group 2 (Competitors)**: 28.1% (lowest - competitors hint helps)
+- **Group 1 (Self)**: 35.6% (highest)
+- **Interpretation**: Gemini's bias is moderate and **responsive to hinting conditions**, showing the most variation across groups
+
+### Cross-Judge Comparison
+
+#### Group 1 (Self) - Judges see only their own model
+
+| Judge | Claude | Gemini | GPT |
+|-------|--------|--------|-----|
+| claude_fast | **32.5%** | 13.8% | 53.8% |
+| claude_thinking | **40.0%** | 18.8% | 41.3% |
+| gemini_fast | 25.0% | **30.0%** | 45.0% |
+| gemini_thinking | 21.3% | **26.3%** | 52.5% |
+| gpt_fast | 23.8% | 17.5% | **58.8%** |
+| gpt_thinking | 20.0% | 7.5% | **72.5%** |
+
+**Key observation**: GPT thinking tier shows highest self-bias (72.5%) when they know their own identity.
+
+#### Group 3 (Full) - All models revealed
+
+| Judge | Claude | Gemini | GPT |
+|-------|--------|--------|-----|
+| claude_fast | **34.4%** | 15.0% | 50.6% |
+| claude_thinking | **40.0%** | 20.0% | 40.0% |
+| gemini_fast | 26.3% | **30.0%** | 43.8% |
+| gemini_thinking | 21.3% | **26.3%** | 52.5% |
+| gpt_fast | 23.8% | 17.5% | **58.8%** |
+| gpt_thinking | 20.0% | 7.5% | **72.5%** |
+
+**Key observation**: Full transparency produces more balanced selections, with GPT still dominating but less so than in other conditions.
+
+### Top-Vendor Distribution Insights
+
+1. **GPT dominates across all conditions**
+   - GPT answers ranked #1: 51.7% - 55.2% across all groups
+   - This dominance persists regardless of hinting
+   - **Interpretation**: GPT answers may genuinely be higher quality, OR judges consistently favor GPT regardless of bias
+
+2. **Claude and Gemini are under-selected**
+   - Claude: 23.5% - 27.1% (below expected 33.3%)
+   - Gemini: 19.0% - 21.9% (below expected 33.3%)
+   - **Interpretation**: Either GPT answers are genuinely better, or there's systematic bias favoring GPT across all judges
+
+3. **Group 3 (Full) shows most balanced distribution**
+   - GPT: 51.7% (lowest across groups)
+   - Claude: 26.5% (closer to expected)
+   - Gemini: 21.9% (closer to expected)
+   - **Interpretation**: Full transparency may reduce extreme preferences
+
+---
+
+## Hypotheses Evaluation
+
+| Hypothesis | Result | Evidence |
+|------------|--------|----------|
+| Self-hint increases self-bias | ❌ **Rejected** | Group 1 shows -1.25pp from baseline (decrease) |
+| Competitor-hint reduces self-bias | ⚠️ **Partially supported** | Group 2 shows +0.83pp (minimal change) |
+| Full transparency reduces bias | ❌ **Rejected** | Group 3 shows +1.46pp (increase) |
+| Hinting significantly affects bias | ❌ **Rejected** | All changes <2pp (minimal impact) |
+
+**Key Finding**: None of the hinting modes significantly reduce self-bias. The effect of revealing model identities is minimal (<2pp change), suggesting that **judge bias is robust to hinting interventions**.
+
+---
+
+## Recommendations
+
+1. **Use Group 3 (Full) - Full Transparency**
+   - Best balance score (13.10) and consistency (14.00)
+   - Most balanced vendor distribution
+   - Transparent process (all models revealed)
+   - Small trade-off in average self-bias is acceptable for better overall fairness
+
+2. **Alternative: Use Group 1 (Self) if minimizing self-bias is priority**
+   - Lowest average self-bias (41.25%)
+   - Claude shows self-awareness effect (25.6% self-bias)
+   - However, worse balance and consistency than Group 3
+
+3. **Consider vendor-specific strategies**
+   - Claude: Self-hint may help (25.6% vs 30.0% baseline)
+   - GPT: No hinting mode significantly reduces bias (62-66% across all groups)
+   - Gemini: Competitors hint may help (28.1% vs 33.1% baseline)
+
+
+## How to Run All Groups (1-3)
 
 ```bash
 cd /path/to/LLM_Eval
@@ -80,120 +288,7 @@ python src/judge_answers.py \
   --judges gemini_fast \
   --limit 5
 ```
-
-## Hint Examples
-
-### Group 1: Self-hint
+## Analyze
+```bash
+jupyter notebook experiments/exp3_hinting/analysis.ipynb
 ```
-[A] Answer text...
-[B] Answer text...
-...
-**Note**: Answer(s) B, E are from GPT.
-```
-
-### Group 2: Competitors-hint
-```
-[A] Answer text...
-[B] Answer text...
-...
-**Model hints**: [A] = CLAUDE, [B] = Not disclosed, [C] = GPT, [D] = GEMINI, [E] = CLAUDE, [F] = GPT
-```
-*Note: Judge's own model is marked as "Not disclosed" to prevent deduction by elimination*
-
-### Group 3: Full-hint
-```
-[A] Answer text...
-[B] Answer text...
-...
-**Model hints**: [A] = CLAUDE, [B] = GPT, [C] = GEMINI, [D] = CLAUDE, [E] = GPT, [F] = GEMINI
-```
-
-## Hypotheses
-
-1. **Self-hint increases self-bias**: Judges favor own model more when they know which answer is theirs
-2. **Competitor-hint reduces self-bias**: Knowing competitors but not self leads to fairer evaluation
-3. **Full transparency**: May increase or decrease bias depending on model
-
-## Available Data
-
-| Output | Description | Status |
-|--------|-------------|--------|
-| `judgments_group2.json` | Judgments with competitor-hints | ✅ Available |
-| `judgments_group4.json` | Baseline blind judgments (from exp2) | ✅ Available |
-| `group1_self.json` | Judgments with self-hints | ⏳ Pending |
-| `group3_full.json` | Judgments with full hints | ⏳ Pending |
-| `analysis.ipynb` | Cross-group comparison | ✅ Available |
-
-## Cost Estimate
-
-- **Groups 1-3**: ~$45 (480 × 3 judge calls)
-- **Quick test**: ~$1
-
-## Results (Available Groups Only)
-
-**Note**: This analysis includes only Group 2 (Competitors) and Group 4 (Blind) as these are the currently available judgment files.
-
-### 1. Self-Bias Detection Summary (Group 2 vs Group 4)
-
-| Vendor | Group 2 (Competitors) | Group 4 (Blind) | Change (pp) | Verdict |
-|--------|----------------------|-----------------|-------------|---------|
-| **Claude** | 36.25% | 30.00% | +6.25 | ✅ **LEAST BIASED** |
-| **Gemini** | 28.12% | 33.12% | -5.00 | ⚠️ Mild bias |
-| **GPT** | 65.62% | 64.38% | +1.25 | ❌ **MOST BIASED** |
-
-*pp = percentage points (arithmetic difference between percentages)*
-
-### 2. Cross-Judge Comparison (Group 2 - Top-1 Selection %)
-
-| Judge | Claude | Gemini | GPT |
-|-------|--------|--------|-----|
-| claude_fast | 32.50 | 13.75 | **53.75** |
-| claude_thinking | 40.00 | 18.75 | **41.25** |
-| gemini_fast | 25.00 | 30.00 | **45.00** |
-| gemini_thinking | 21.25 | 26.25 | **52.50** |
-| gpt_fast | 23.75 | 17.50 | **58.75** |
-| gpt_thinking | 20.00 | 7.50 | **72.50** |
-
-### 3. Self-Bias Change from Baseline
-
-| Vendor | Group 2 Rate | Group 4 Rate | Change (pp) | Effect |
-|--------|--------------|--------------|------------|-------|
-| Claude | 36.25% | 30.00% | +6.25 | ⚠️ Slight increase |
-| GPT | 65.62% | 64.38% | +1.25 | ➡️ Minimal change |
-| Gemini | 28.12% | 33.12% | -5.00 | ✅ Slight decrease |
-
----
-
-## Key Findings 🔎
-
-1. **Competitors hint has minimal effect on GPT self-bias**
-   - GPT self-preference: 65.62% (Group 2) vs 64.38% (Group 4)
-   - Change: +1.25 percentage points (minimal change)
-   - GPT remains highly biased even when competitors are revealed
-   - The +1.25pp change is negligible, indicating competitors hint does not reduce GPT's strong self-preference
-
-2. **Claude shows slight increase in self-bias**
-   - Claude self-preference: 36.25% (Group 2) vs 30.00% (Group 4)
-   - Change: +6.25 percentage points (slight increase)
-   - Still remains the least biased judge overall (closest to expected 33.33%)
-   - The increase is modest and Claude maintains relative impartiality
-
-3. **Gemini shows slight decrease in self-bias**
-   - Gemini self-preference: 28.12% (Group 2) vs 33.12% (Group 4)
-   - Change: -5.00 percentage points (slight decrease)
-   - Revealing competitors may help Gemini be more impartial
-   - This is the only vendor showing reduced self-bias with competitors hint
-
-4. **Overall pattern**: Revealing competitor identities (while hiding own) does not significantly reduce self-bias for highly biased models like GPT. The effect is minimal across all vendors, suggesting that competitor awareness alone is insufficient to mitigate strong self-preference bias.
-
----
-
-## Pending Analysis
-
-The following groups are not yet available and will be analyzed when data becomes available:
-
-- **Group 1 (Self)**: Judges see only their own model revealed
-- **Group 3 (Full)**: All models revealed
-
-Once these groups are available, the analysis will be updated to include all four groups for comprehensive comparison.
-
