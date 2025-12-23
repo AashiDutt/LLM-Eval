@@ -39,7 +39,7 @@ LLM_Eval/
 ## Experiments
 
 | # | Experiment | Question | Key Finding |
-|---|------------|----------|--------|-------------|
+|---|------------|----------|--------|
 | 1 | [Blind Judge](experiments/exp1_blind_judge/) | Self-preference with anonymous answers? | GPT shows +60% self-bias |
 | 2 | [MT-Bench Analysis](experiments/exp2_mt_bench/) | Does bias vary by domain?  | GPT bias strongest in creative domains (90%) |
 | 3 | [Hinting Effect](experiments/exp3_hinting/) | Does revealing model names matter? | Hinting has minimal impact (<2pp change) |
