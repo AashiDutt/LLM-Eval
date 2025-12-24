@@ -58,8 +58,9 @@ How often each vendor's judges rank their own vendor's answers on top, compared 
 | **Gemini** | 31.25% | 33.33% | +11.50 | **Mild Biased** |
 | **GPT** | 70.00% | 33.33% | +36.67 | **Most Biased** |
 
-*pp = percentage points (arithmetic difference between percentages)*
-*Columns = self-preference rate, expected unbiased rate (33.33%), bias difference in percentage points, and verdict.*
+**Self-Preference**: Percentage of times the vendor's judges rank their own vendor #1
+
+**Bias (pp)**: Difference from expected in percentage points (pp = percentage points (arithmetic difference between percentages))
 
 ### 2. Cross-Judge Comparison (Top-1 Selection %)
 
@@ -84,9 +85,9 @@ Average scores (0-10 scale) given by Gemini Thinking judge to each vendor's fast
 |--------|-----------|---------------|
 | Claude | 7.30 ± 2.23 | 7.96 ± 1.84 |
 | Gemini | 6.01 ± 3.41 | 7.55 ± 2.75 |
-| GPT | 7.05 ± 3.26 | **8.47 ± 2.21** |
+| GPT | 7.05 ± 3.26 | 8.47 ± 2.21 |
 
-*Bold indicates highest score. Standard deviation shows score variability across 80 prompts (single run)*
+*mean ± standard deviation, where standard deviation shows score variability across 80 prompts (single run).*
 
 ### 4. Category-wise Preferences by Judge Family
 
@@ -153,29 +154,7 @@ The percentage of times thinking-tier vs fast-tier models are ranked #1 across a
 
 ### Overall Self-Bias Patterns
 
-1. **GPT judges show the strongest self-preference**
-   - GPT's self-preference is 70% vs an expected baseline of 33.33%, making it the most biased judge family in this run (+36.67 pp).
-   - GPT judge picks GPT answers 70% of the time, while other judges pick GPT answers at 49.75% average.
-   - That's a +20.25 percentage point self-preference gap.
-
-2. **Claude is the least biased**
-   - Claude's self-preference is ~32.5% (close to baseline), showing minimal self-bias.
-   - Claude judge actually rates GPT answers highest (50%), not its own.
-   - This suggests Claude's impartiality rather than self-favoritism.
-
-3. **Gemini shows mild self-bias**
-   - Gemini's self-preference is 31.25%, slightly below expected baseline.
-   - Gemini judge ranks Gemini #1 at 31.25%, while other judges rank Gemini #1 at 19.75% average.
-   - Bias difference: +11.50 percentage points.
-
-4. **GPT answers are selected Top-1 most often across judges**
-   - Across judges, GPT answers are selected Top-1 most often, even by non-GPT judges.
-   - Claude and Gemini judges still pick GPT frequently (50% and 42.5% respectively).
-   - Cross-judge agreement suggests GPT answers may have genuine quality advantages.
-
-5. **Cross-judge agreement as proxy for content quality**
-   - GPT winning under both GPT and non-GPT judges suggests "real" quality rather than just judge favoritism.
-   - However, the +20pp gap between GPT judge and others indicates self-bias is still present.
+GPT judges show the strongest self-preference bias, ranking their own answers #1 significantly more often than expected. Claude demonstrates the least bias, with self-preference rates close to the baseline and actually favoring GPT answers over its own. Gemini shows mild self-bias, particularly in its core strength domains. While GPT answers are selected most frequently even by non-GPT judges (suggesting genuine quality advantages), the substantial gap between GPT judge preferences and other judges' preferences indicates clear self-bias is present.
 
 ### Domain-wise Breakdown
 

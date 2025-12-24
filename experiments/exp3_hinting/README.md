@@ -16,7 +16,7 @@
 - **Prompts**: 80 MT-Bench style prompts
 - **Hinting**: 4 modes (self, competitors, full, none)
 - **Judgments per group**: 480 (80 prompts × 6 judges)
-- **Total judgments**: 1,920 (480 × 4 groups)
+
 
 ## Categories (10 prompts each)
 
@@ -68,7 +68,8 @@ We compared the four hinting groups across key fairness metrics. Best column ind
 | **Consistency** | 15.57 | 16.11 | 14.00 | 15.52 | Group 3 |
 
 *pp = percentage points (arithmetic difference between percentages)*
-*Note: Lower values are better for all metrics. Expected self-bias = 33.33% (3 vendors, unbiased)*
+
+*Note: Lower values are better for all metrics.*
 
 ## Vendor-Specific Self-Bias Rates
 
@@ -107,7 +108,7 @@ Here are recommendations for selecting a hinting group based on different resear
 |------|------------------|-----------|------------|
 | **Benchmark Validity** | Group 4 (Blind) | Most defensible protocol; minimizes identity effects | Baseline self-bias (42.50%) |
 | **Bias Mitigation** | Group 1 (Self) | Lowest average self-bias (41.25%); Claude shows self-awareness (25.6%) | Worse balance and consistency |
-| **Stable/Balanced Selection** | Group 3 (Full) | Best balance score (13.10) and consistency (14.00); most even vendor distribution | Highest average self-bias (43.96%); least blind |
+| **Balanced Selection** | Group 3 (Full) | Produces most even vendor distribution | Highest average self-bias (43.96%) |
 | **Avoid** | Group 2 (Competitors) | Highest average self-bias (43.33%); GPT bias peaks (65.6%) | Only use if studying bias amplification |
 
 *Note: "33.33%" is a naive uniform baseline (3 vendors). Real-world "unbiased" rates can differ due to answer quality, prompt mix, and judge preference for style.*
