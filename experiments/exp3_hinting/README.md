@@ -34,7 +34,7 @@ We compared the four hinting groups across fairness/stability metrics. **Lower i
 - **pp** = *percentage points* (arithmetic difference between percentages).
 - **stdev (pp)** = standard deviation computed on percentages, reported in percentage points.
 
-**Metric definitions (consistent wording)**
+**Metric definitions**
 
 - **Average Self-Bias (%)**: For each **vendor** \(v ∈ {Claude, GPT, Gemini}\), compute  
   `self_bias(v) = P(judges from v pick v as Top-1)`.  
