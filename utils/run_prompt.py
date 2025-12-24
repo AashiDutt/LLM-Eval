@@ -22,13 +22,13 @@ def select_prompt(prompts: list[dict], prompt_id: Optional[str], prompt_index: i
             if prompt.get("id") == prompt_id:
                 return prompt
         raise ValueError(f"Prompt with id '{prompt_id}' not found in prompts file.")
-    
+
     if not prompts:
         raise ValueError("Prompts file is empty.")
-    
+
     if prompt_index < 0 or prompt_index >= len(prompts):
-        raise IndexError(f"prompt_index {prompt_index} out of range (0-{len(prompts)-1}).")
-    
+        raise IndexError(f"prompt_index {prompt_index} out of range (0-{len(prompts) - 1}).")
+
     return prompts[prompt_index]
 
 
@@ -41,13 +41,11 @@ def main():
     parser.add_argument("--vendor", type=str, required=True, choices=["gpt", "gemini", "claude"], help="Model vendor.")
     parser.add_argument("--tier", type=str, required=True, choices=["fast", "thinking"], help="Model tier.")
     parser.add_argument(
-        "--use-response-model",
-        action="store_true",
-        help="Request structured output using the JudgmentSchema."
+        "--use-response-model", action="store_true", help="Request structured output using the JudgmentSchema."
     )
-    
+
     args = parser.parse_args()
-    
+
     config = load_config(args.config)
     system_prompt = None
     if "prompts" in args.prompts:
@@ -58,15 +56,15 @@ def main():
         answers = load_json(args.prompts)
         answers_by_prompt = {}
         for answer in answers:
-            prompt_id = answer['prompt_id']
+            prompt_id = answer["prompt_id"]
             if prompt_id not in answers_by_prompt:
                 answers_by_prompt[prompt_id] = []
             answers_by_prompt[prompt_id].append(answer)
         for prompt_id, prompt_answers in answers_by_prompt.items():
-            prompt_text = prompt_answers[0]['prompt_text']
+            prompt_text = prompt_answers[0]["prompt_text"]
             answers = prompt_answers
-            break 
-        
+            break
+
         anonymized, _ = anonymize_and_shuffle(answers, seed=32)
         system_prompt, prompt_text = format_judge_prompt(prompt_text, anonymized)
     else:
@@ -74,32 +72,33 @@ def main():
 
     if not prompt_text:
         raise ValueError("Selected prompt has no 'text' field.")
-    
+
     model_factory = ModelFactory(config)
     model = model_factory.get_model(args.vendor, args.tier)
-    
+
     response_model = JudgmentSchema if args.use_response_model else None
-    
-    response = model.generate(
-        prompt_text,
-        system_prompt=system_prompt,
-        response_model=response_model
-    )
-    
+
+    response = model.generate(prompt_text, system_prompt=system_prompt, response_model=response_model)
+
     if isinstance(response, BaseModel):
         output = response.model_dump()
     elif isinstance(response, dict):
         output = response
     else:
         output = {"raw": str(response)}
-    
-    print(json.dumps({
-        "prompt_id": prompt.get("id") if system_prompt is None else prompt_id,
-        "vendor": args.vendor,
-        "tier": args.tier,
-        "use_response_model": args.use_response_model,
-        "output": output
-    }, indent=2))
+
+    print(
+        json.dumps(
+            {
+                "prompt_id": prompt.get("id") if system_prompt is None else prompt_id,
+                "vendor": args.vendor,
+                "tier": args.tier,
+                "use_response_model": args.use_response_model,
+                "output": output,
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

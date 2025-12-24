@@ -19,10 +19,7 @@ print_lock = threading.Lock()
 
 
 def generate_answer(
-    model_wrapper,
-    prompt_text: str,
-    retries: int = 3,
-    retry_delay: float = 1.0
+    model_wrapper, prompt_text: str, retries: int = 3, retry_delay: float = 1.0
 ) -> str | dict[str, str]:
     for attempt in range(retries):
         try:
@@ -35,31 +32,22 @@ def generate_answer(
             continue
 
 
-def generate_single_task(
-    task: dict[str, str],
-    retries: int,
-    retry_delay: float
-) -> dict[str, str]:
-    model = task['model']
-    prompt = task['prompt']
-    vendor = task['vendor']
-    tier = task['tier']
-    
-    answer_text = generate_answer(
-        model,
-        prompt['text'],
-        retries=retries,
-        retry_delay=retry_delay
-    )
-    
-    return_dict =  {
+def generate_single_task(task: dict[str, str], retries: int, retry_delay: float) -> dict[str, str]:
+    model = task["model"]
+    prompt = task["prompt"]
+    vendor = task["vendor"]
+    tier = task["tier"]
+
+    answer_text = generate_answer(model, prompt["text"], retries=retries, retry_delay=retry_delay)
+
+    return_dict = {
         "answer_id": f"ans_{prompt['id']}_{vendor}_{tier}",
-        "prompt_id": prompt['id'],
-        "category": prompt['category'],
+        "prompt_id": prompt["id"],
+        "category": prompt["category"],
         "model_vendor": vendor,
         "model_tier": tier,
         "model_name": model.model_name,
-        "prompt_text": prompt['text'],
+        "prompt_text": prompt["text"],
     }
     if isinstance(answer_text, dict) and "error" in answer_text:
         return_dict.update(answer_text)
@@ -75,73 +63,63 @@ def generate_all_answers(
     verbose: bool = True,
     max_workers: int = 6,
     retries: int = 3,
-    retry_delay: float = 1.0
+    retry_delay: float = 1.0,
 ) -> list[dict[str, str]]:
     models = model_factory.get_all_models()
-    vendors = ['claude', 'gpt', 'gemini']
-    tiers = ['fast', 'thinking']
-    
+    vendors = ["claude", "gpt", "gemini"]
+    tiers = ["fast", "thinking"]
+
     tasks = []
     for prompt in prompts:
         for vendor in vendors:
             for tier in tiers:
                 model_key = f"{vendor}_{tier}"
                 if models[model_key] is not None:
-                    tasks.append({
-                        'model': models[model_key],
-                        'prompt': prompt,
-                        'vendor': vendor,
-                        'tier': tier
-                    })
-    
+                    tasks.append({"model": models[model_key], "prompt": prompt, "vendor": vendor, "tier": tier})
+
     total_tasks = len(tasks)
     if verbose:
         print(f"\nRunning {total_tasks} tasks with {max_workers} concurrent workers...")
-    
+
     if total_tasks == 0:
         return []
-    
+
     ordered_answers: list[dict[str, str] | None] = [None] * total_tasks
-    
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_index = {
-            executor.submit(
-                generate_single_task,
-                task,
-                retries,
-                retry_delay
-            ): idx
-            for idx, task in enumerate(tasks)
+            executor.submit(generate_single_task, task, retries, retry_delay): idx for idx, task in enumerate(tasks)
         }
         pbar = tqdm(total=total_tasks, desc="Generating answers") if verbose else None
-        
+
         for future in as_completed(future_to_index):
             idx = future_to_index[future]
             task = tasks[idx]
             try:
                 result = future.result()
                 ordered_answers[idx] = result
-                
+
                 if verbose:
                     with print_lock:
                         status = "✓" if "error" not in result else "✗"
                         detail = (
                             f"{len(result['answer_text'])} chars"
-                            if "answer_text" in result else result.get("error", "error")
+                            if "answer_text" in result
+                            else result.get("error", "error")
                         )
                         tqdm.write(f"  {status} {task['vendor']}_{task['tier']} → {task['prompt']['id']} ({detail})")
-                
+
             except Exception as e:
                 if verbose:
                     with print_lock:
                         tqdm.write(f"  ✗ {task['vendor']}_{task['tier']} → {task['prompt']['id']} FAILED: {e}")
-            
+
             if pbar:
                 pbar.update(1)
-        
+
         if pbar:
             pbar.close()
-    
+
     return [answer for answer in ordered_answers if answer is not None]
 
 
@@ -155,82 +133,84 @@ def main():
     parser.add_argument("--verbose", action="store_true", default=True)
     parser.add_argument("--workers", type=int, default=6, help="Number of concurrent workers (default: 6)")
     parser.add_argument("--retries", type=int, default=3, help="Number of retries per generation (default: 3)")
-    parser.add_argument("--retry-delay", type=float, default=1.0, help="Seconds to wait between retries (default: 1.0)")
-    
+    parser.add_argument(
+        "--retry-delay", type=float, default=1.0, help="Seconds to wait between retries (default: 1.0)"
+    )
+
     args = parser.parse_args()
-    
+
     print("Loading configuration...")
     config = load_config(args.config)
-    
+
     print("Loading prompts...")
     prompts = load_prompts(args.prompts)
-    
+
     if args.category:
-        prompts = [p for p in prompts if p['category'] == args.category]
+        prompts = [p for p in prompts if p["category"] == args.category]
         print(f"Filtered to {len(prompts)} prompts in category '{args.category}'")
-    
+
     if args.limit:
-        prompts = prompts[:args.limit]
+        prompts = prompts[: args.limit]
         print(f"Limited to first {args.limit} prompts")
-    
+
     print(f"Processing {len(prompts)} prompts across 6 models (3 vendors × 2 tiers)")
     print(f"Total API calls: {len(prompts) * 6}")
     print(f"Concurrent workers: {args.workers}")
-    
+
     print("\nInitializing model factory...")
     model_factory = ModelFactory(config)
-    
+
     print("\nTesting API connections...")
     models = model_factory.get_all_models()
     for name, model in models.items():
-        vendor, tier = name.split('_')
+        vendor, tier = name.split("_")
         if model and tier:
             print(f"  {vendor.capitalize()} ({tier}): {model.model_name}")
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("STARTING ANSWER GENERATION")
-    print("="*60)
-    
+    print("=" * 60)
+
     answers = generate_all_answers(
         prompts=prompts,
         model_factory=model_factory,
         verbose=args.verbose,
         max_workers=args.workers,
         retries=args.retries,
-        retry_delay=args.retry_delay
+        retry_delay=args.retry_delay,
     )
-    
+
     if args.output is None:
         timestamp = generate_timestamp()
         output_path = f"data/answers/answers_{timestamp}.json"
     else:
         output_path = args.output
-    
+
     print(f"\nSaving {len(answers)} answers to {output_path}")
     save_json(answers, output_path)
-    
-    print("\n" + "="*60)
+
+    print("\n" + "=" * 60)
     print("SUMMARY")
-    print("="*60)
-    
+    print("=" * 60)
+
     by_vendor = {}
     by_category = {}
-    
+
     for answer in answers:
-        vendor = answer['model_vendor']
-        category = answer['category']
-        
+        vendor = answer["model_vendor"]
+        category = answer["category"]
+
         by_vendor[vendor] = by_vendor.get(vendor, 0) + 1
         by_category[category] = by_category.get(category, 0) + 1
-    
+
     print("\nAnswers by vendor:")
     for vendor, count in sorted(by_vendor.items()):
         print(f"  {vendor.capitalize()}: {count}")
-    
+
     print("\nAnswers by category:")
     for category, count in sorted(by_category.items()):
         print(f"  {category}: {count}")
-    
+
     print(f"\n✓ Done! Answers saved to: {output_path}")
 
 

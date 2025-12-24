@@ -5,11 +5,12 @@ Regenerate dubious answers (empty strings or API failures) in answers.json.
 The script reuses the `generate_answer` helper from `utils/generate_answers.py`
 to keep retry behavior identical to the main generation pipeline.
 """
+
 from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Any
 
 from tqdm import tqdm
 
@@ -29,9 +30,7 @@ def regenerate_entry(model, prompt_text: str, retries: int) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Regenerate dubious answers (empty or failed outputs)."
-    )
+    parser = argparse.ArgumentParser(description="Regenerate dubious answers (empty or failed outputs).")
     parser.add_argument(
         "--config",
         default="config.yaml",
@@ -62,11 +61,9 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
-    answers: List[Dict[str, Any]] = load_json(args.answers)
+    answers: list[dict[str, Any]] = load_json(args.answers)
 
-    dubious_indices = [
-        idx for idx, answer in enumerate(answers) if "error" in answer and answer.get("error", "")
-    ]
+    dubious_indices = [idx for idx, answer in enumerate(answers) if "error" in answer and answer.get("error", "")]
 
     if not dubious_indices:
         print("No dubious answers detected. Nothing to do.")
@@ -75,14 +72,12 @@ def main() -> None:
     print(f"Found {len(dubious_indices)} dubious answers. Regenerating...")
 
     model_factory = ModelFactory(config)
-    model_cache: Dict[Tuple[str, str, str], Any] = {}
+    model_cache: dict[tuple[str, str, str], Any] = {}
 
     def get_model_instance(vendor: str, tier: str, model_name: str):
         key = (vendor, tier, model_name)
         if key not in model_cache:
-            model_cache[key] = model_factory.get_model(
-                vendor, tier, model_name_override=model_name
-            )
+            model_cache[key] = model_factory.get_model(vendor, tier, model_name_override=model_name)
         return model_cache[key]
 
     tasks = []
@@ -105,7 +100,7 @@ def main() -> None:
 
     pbar = tqdm(total=len(tasks), desc="Regenerating answers")
     failures = 0
-    ordered_outputs: List[Optional[str]] = [None] * len(tasks)
+    ordered_outputs = [None] * len(tasks)
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_to_index = {
