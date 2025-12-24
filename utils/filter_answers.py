@@ -1,4 +1,4 @@
-import json 
+import json
 
 with open("regenerated_judgments_4.json") as f:
     judgements = json.load(f)

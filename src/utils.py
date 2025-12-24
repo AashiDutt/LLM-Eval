@@ -4,39 +4,39 @@ import yaml
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Any
 from dotenv import load_dotenv
 
 
-def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
-    with open(config_path, 'r') as f:
+def load_config(config_path: str = "config.yaml") -> dict[str, Any]:
+    with open(config_path, "r") as f:
         config = yaml.safe_load(f)
-    
+
     load_dotenv()
-    
-    if 'api_keys' in config:
-        for provider, key_var in config['api_keys'].items():
-            if isinstance(key_var, str) and key_var.startswith('${') and key_var.endswith('}'):
+
+    if "api_keys" in config:
+        for provider, key_var in config["api_keys"].items():
+            if isinstance(key_var, str) and key_var.startswith("${") and key_var.endswith("}"):
                 env_var = key_var[2:-1]
-                config['api_keys'][provider] = os.getenv(env_var)
-    
+                config["api_keys"][provider] = os.getenv(env_var)
+
     return config
 
 
-def load_prompts(prompts_path: str = "prompts.json") -> List[Dict[str, Any]]:
-    with open(prompts_path, 'r') as f:
+def load_prompts(prompts_path: str = "prompts.json") -> list[dict[str, Any]]:
+    with open(prompts_path, "r") as f:
         data = json.load(f)
-    return data['prompts']
+    return data["prompts"]
 
 
 def save_json(data: Any, filepath: str, indent: int = 2) -> None:
     Path(filepath).parent.mkdir(parents=True, exist_ok=True)
-    with open(filepath, 'w') as f:
+    with open(filepath, "w") as f:
         json.dump(data, f, indent=indent)
 
 
 def load_json(filepath: str) -> Any:
-    with open(filepath, 'r') as f:
+    with open(filepath, "r") as f:
         return json.load(f)
 
 
@@ -44,37 +44,34 @@ def generate_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
-def anonymize_and_shuffle(answers: List[Dict[str, Any]], seed: Optional[int] = None) -> tuple:
+def anonymize_and_shuffle(answers: list[dict[str, Any]], seed: int = None) -> tuple:
     if seed is not None:
         random.seed(seed)
-    
+
     labels = [chr(65 + i) for i in range(len(answers))]
-    
+
     shuffled_indices = list(range(len(answers)))
     random.shuffle(shuffled_indices)
-    
+
     anonymized = []
     mapping = {}
-    
+
     for i, idx in enumerate(shuffled_indices):
         label = labels[i]
         answer = answers[idx]
-        anonymized.append({
-            "label": label,
-            "text": answer['answer_text']
-        })
-        mapping[label] = answer['answer_id']
-    
+        anonymized.append({"label": label, "text": answer["answer_text"]})
+        mapping[label] = answer["answer_id"]
+
     return anonymized, mapping
 
 
 def format_judge_prompt(
-    question: str, 
-    anonymized_answers: List[Dict[str, str]],
+    question: str,
+    anonymized_answers: list[dict[str, str]],
     hint_mode: str = "none",
-    judge_vendor: Optional[str] = None,
-    label_to_vendor: Optional[Dict[str, str]] = None
-) -> Tuple[str, str]:
+    judge_vendor: str = None,
+    label_to_vendor: dict[str, str] = None,
+) -> tuple[str, str]:
     system_prompt = """You are an impartial judge. Evaluate the provided answers and respond ONLY with valid JSON.
 
 For inputs, you will be provided with a question and different answers obtained from different AI models.
@@ -94,26 +91,21 @@ Requirements:
   "scores" must include all labels exactly once as keys (A-F), each mapped to an integer 0-10.
 
 """
-    
+
     judge_vendor_norm = (judge_vendor or "").strip().lower() if judge_vendor else None
-    
+
     hint_text = ""
     if hint_mode != "none" and label_to_vendor:
         normalized_map = {lbl: (v or "").strip() for lbl, v in label_to_vendor.items()}
 
         if hint_mode == "self" and judge_vendor_norm:
-            own_labels = [
-                label for label, vendor in normalized_map.items()
-                if vendor.lower() == judge_vendor_norm
-            ]
+            own_labels = [label for label, vendor in normalized_map.items() if vendor.lower() == judge_vendor_norm]
             own_labels = sorted(own_labels)
             if own_labels:
-                hint_text = (
-                    f"\n**Note**: Answer(s) {', '.join(own_labels)} are from {judge_vendor_norm.upper()}.\n"
-                )
+                hint_text = f"\n**Note**: Answer(s) {', '.join(own_labels)} are from {judge_vendor_norm.upper()}.\n"
 
         elif hint_mode == "competitors" and judge_vendor_norm:
-            all_hints: List[str] = []
+            all_hints: list[str] = []
             for label in sorted(normalized_map.keys()):
                 vendor = normalized_map[label]
                 if vendor.lower() == judge_vendor_norm:
@@ -132,21 +124,22 @@ Requirements:
 
         else:
             hint_text = ""
-    
+
     user_prompt = f"Question:\n{question}\n\nAnswers (unordered):\n"
     for ans in anonymized_answers:
         user_prompt += f"\n[{ans['label']}] {ans['text']}\n"
-    
+
     if hint_text:
         user_prompt += hint_text
-    
+
     return system_prompt, user_prompt
 
 
 def fix_json_trailing_commas(json_str: str) -> str:
     import re
-    json_str = re.sub(r',\s*}', '}', json_str)
-    json_str = re.sub(r',\s*]', ']', json_str)
+
+    json_str = re.sub(r",\s*}", "}", json_str)
+    json_str = re.sub(r",\s*]", "]", json_str)
     return json_str
 
 
@@ -165,7 +158,7 @@ def _strip_code_fences(s: str) -> str:
     return s.strip()
 
 
-def _find_first_json_span(s: str) -> Optional[Tuple[int, int]]:
+def _find_first_json_span(s: str) -> tuple[int, int] | None:
     """
     Return (start, end) slice for the first complete JSON object/array in s,
     using bracket balancing while respecting quoted strings.
@@ -217,7 +210,7 @@ def _find_first_json_span(s: str) -> Optional[Tuple[int, int]]:
     return None
 
 
-def extract_json_from_response(response: str) -> Dict[str, Any]:
+def extract_json_from_response(response: str) -> dict[str, Any]:
     raw = response.strip()
     raw = _strip_code_fences(raw)
 
@@ -265,7 +258,7 @@ def extract_json_from_response(response: str) -> Dict[str, Any]:
 
 
 def get_model_vendor_and_tier(answer_id: str) -> tuple:
-    parts = answer_id.split('_')
+    parts = answer_id.split("_")
     if len(parts) >= 4:
         vendor = parts[2]
         tier = parts[3]
@@ -273,15 +266,16 @@ def get_model_vendor_and_tier(answer_id: str) -> tuple:
     raise ValueError(f"Invalid answer_id format: {answer_id}")
 
 
-def calculate_statistics(data: List[float]) -> Dict[str, float]:
+def calculate_statistics(data: list[float]) -> dict[str, float]:
     if not data:
         return {"mean": 0, "std": 0, "min": 0, "max": 0, "count": 0}
-    
+
     import numpy as np
+
     return {
         "mean": float(np.mean(data)),
         "std": float(np.std(data)),
         "min": float(np.min(data)),
         "max": float(np.max(data)),
-        "count": len(data)
+        "count": len(data),
     }

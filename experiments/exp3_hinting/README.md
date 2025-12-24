@@ -18,20 +18,36 @@ before proceeding with the rest of the sections.
 > [!NOTE] 
 > Group 4 (`none`) is essentially **Experiment 2** - it uses the same blind judgment protocol with no model identity hints. The judgments are reused from Experiment 2's results.
 
-## Main Metrics Comparison
+## Main Metrics Comparison (clarified units + definitions)
 
-We compared the four hinting groups across key fairness metrics. Best column indicates which group performs best for each metric (lower is better for all metrics).
+We compared the four hinting groups across fairness/stability metrics. **Lower is better** for all metrics below, but note that **“more balanced” ≠ “unbiased”** (it only means Top-1 wins are more evenly spread).
 
 | Metric | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) | Best |
 |--------|----------------|----------------------|----------------|-----------------|------|
-| **Average Self-Bias** | 41.25% | 43.33% | 43.96% | 42.50% | Group 1 |
-| **Deviation from Expected** | 13.06pp | 13.47pp | 10.63pp | 11.53pp | Group 3 |
-| **Balance Score** | 15.50 | 14.96 | 13.10 | 14.07 | Group 3 |
-| **Consistency** | 15.57 | 16.11 | 14.00 | 15.52 | Group 3 |
+| **Average Self-Bias (%)** | 41.25% | 43.33% | 43.96% | 42.50% | Group 1 |
+| **Deviation from Expected (pp)** | 13.06 pp | 13.47 pp | 10.63 pp | 11.53 pp | Group 3 |
+| **Balance Score (pp, stdev)** | 15.50 | 14.96 | 13.10 | 14.07 | Group 3 |
+| **Consistency (pp, stdev)** | 15.57 | 16.11 | 14.00 | 15.52 | Group 3 |
 
-*pp = percentage points (arithmetic difference between percentages)*
+**Units**
 
-*Note: Lower values are better for all metrics.*
+- **pp** = *percentage points* (arithmetic difference between percentages).
+- **stdev (pp)** = standard deviation computed on percentages, reported in percentage points.
+
+**Metric definitions (consistent wording)**
+
+- **Average Self-Bias (%)**: For each **vendor** \(v ∈ {Claude, GPT, Gemini}\), compute  
+  `self_bias(v) = P(judges from v pick v as Top-1)`.  
+  Then report the **mean** of `self_bias(v)` across the three vendors.
+
+- **Deviation from Expected (pp)**: For each vendor \(v\), compute  
+  `|self_bias(v) − 33.33%|` (naive baseline for 3 vendors), then average across vendors.
+
+- **Balance Score (pp, stdev)**: Compute overall Top-1 win rate for each vendor across **all judges**, then take the **standard deviation** across the three vendors. Lower = more even Top-1 distribution.
+
+- **Consistency (pp, stdev)**: Compute each **judge model’s** self-bias rate, then take the **standard deviation** across the 6 judges. Lower = judges behave more similarly.
+
+> **Note:** A low **Balance Score** is about “evenness,” not necessarily “fairness.” It can improve simply because judges spread wins more evenly—even if they’re spreading them for the wrong reasons.
 
 ## Vendor-Specific Self-Bias Rates
 
@@ -64,14 +80,12 @@ Average self-bias rates by category for each hinting group, aggregated across al
 
 ## Goal-Based Recommendations
 
-Here are recommendations for selecting a hinting group based on different research or production goals. 
-
 | Goal | Recommended Group | Rationale | Trade-offs |
 |------|------------------|-----------|------------|
-| **Benchmark Validity** | Group 4 (Blind) | Most defensible protocol; minimizes identity effects | Baseline self-bias (42.50%) |
-| **Bias Mitigation** | Group 1 (Self) | Lowest average self-bias (41.25%); Claude shows self-awareness (25.6%) | Worse balance and consistency |
-| **Balanced Selection** | Group 3 (Full) | Produces most even vendor distribution | Highest average self-bias (43.96%) |
-| **Avoid** | Group 2 (Competitors) | Highest average self-bias (43.33%); GPT bias peaks (65.6%) | Only use if studying bias amplification |
+| **Benchmark Validity** | Group 4 (Blind) | Most defensible protocol; minimizes identity leakage | Baseline self-bias remains (42.50%) |
+| **Bias Mitigation** | Group 1 (Self) | Lowest **Average Self-Bias** (41.25%) | Weaker balance/consistency than Group 3 |
+| **Balanced Selection** | Group 3 (Full) | Best **Deviation**, **Balance**, and **Consistency**  | Highest Average Self-Bias (43.96%) |
+| **Use only if studying disruption** | Group 2 (Competitors) | Worst **Consistency** (16.11) and tends to increase instability across judges/vendors | Can amplify bias patterns in some judges |
 
 > [!NOTE]
 > "33.33%" is a naive uniform baseline (3 vendors). Real-world "unbiased" rates can differ due to answer quality, prompt mix, and judge preference for style.*

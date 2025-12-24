@@ -22,12 +22,12 @@ import argparse
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
 
 ERROR_SUBSTR = "[ERROR: Failed to generate answer"
 
 
-JSONType = Union[Dict[str, Any], List[Any]]
+JSONType = dict[str, Any] | list[Any]
 
 
 def is_bad_answer_text(text: Any) -> bool:
@@ -54,7 +54,7 @@ def dump_json(path: Path, obj: JSONType) -> None:
         f.write("\n")
 
 
-def iter_records(data: JSONType) -> List[Dict[str, Any]]:
+def iter_records(data: JSONType) -> list[dict[str, Any]]:
     """
     Supports:
       - list[dict] (your files look like this)
@@ -64,12 +64,10 @@ def iter_records(data: JSONType) -> List[Dict[str, Any]]:
         return [x for x in data if isinstance(x, dict)]
     if isinstance(data, dict) and isinstance(data.get("answers"), list):
         return [x for x in data["answers"] if isinstance(x, dict)]
-    raise ValueError(
-        "Unsupported JSON shape. Expected a list of dicts, or a dict with an 'answers' list."
-    )
+    raise ValueError("Unsupported JSON shape. Expected a list of dicts, or a dict with an 'answers' list.")
 
 
-def set_records(data: JSONType, new_records: List[Dict[str, Any]]) -> JSONType:
+def set_records(data: JSONType, new_records: list[dict[str, Any]]) -> JSONType:
     if isinstance(data, list):
         return new_records
     # dict with "answers"
@@ -82,9 +80,7 @@ def set_records(data: JSONType, new_records: List[Dict[str, Any]]) -> JSONType:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--answers", type=Path, required=True, help="Path to answers.json")
-    ap.add_argument(
-        "--regenerated", type=Path, required=True, help="Path to regenerated_answers.json"
-    )
+    ap.add_argument("--regenerated", type=Path, required=True, help="Path to regenerated_answers.json")
     ap.add_argument(
         "--out",
         type=Path,
@@ -107,7 +103,7 @@ def main() -> None:
     answers = iter_records(answers_data)
     regen = iter_records(regen_data)
 
-    regen_by_id: Dict[str, Dict[str, Any]] = {}
+    regen_by_id: dict[str, dict[str, Any]] = {}
     for r in regen:
         aid = r.get("answer_id")
         if isinstance(aid, str):
@@ -117,7 +113,7 @@ def main() -> None:
     missing_regen = 0
     regen_not_good = 0
 
-    new_answers: List[Dict[str, Any]] = []
+    new_answers: list[dict[str, Any]] = []
     for a in answers:
         aid = a.get("answer_id")
         a_text = a.get("answer_text", "")
@@ -157,9 +153,7 @@ def main() -> None:
         dump_json(args.out, out_data)
         print(f"Wrote patched answers to: {args.out}")
 
-    print(
-        f"Done. swapped={swapped}, missing_regen={missing_regen}, regen_not_good={regen_not_good}"
-    )
+    print(f"Done. swapped={swapped}, missing_regen={missing_regen}, regen_not_good={regen_not_good}")
 
 
 if __name__ == "__main__":

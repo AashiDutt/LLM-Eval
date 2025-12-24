@@ -6,12 +6,13 @@ The script scans the judgments file for entries containing an `error` field,
 reloads the corresponding prompt + answers from the main answers file, and
 re-evaluates them with only the judge model responsible for the failure.
 """
+
 from __future__ import annotations
 
 import argparse
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Tuple, Callable
+from typing import Any, Optional, Callable
 
 from tqdm import tqdm
 
@@ -26,23 +27,23 @@ from src.models import ModelFactory
 from src.judge_answers import judge_prompt_answers
 
 
-def build_answers_index(answers: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-    answers_by_prompt: Dict[str, List[Dict[str, Any]]] = {}
+def build_answers_index(answers: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    answers_by_prompt: dict[str, list[dict[str, Any]]] = {}
     for ans in answers:
         answers_by_prompt.setdefault(ans["prompt_id"], []).append(ans)
     return answers_by_prompt
 
 
 def run_with_retries(
-    task: Dict[str, Any],
+    task: dict[str, Any],
     get_model_fn: Callable[[str, Optional[str]], Any],
     shuffle_seed: int,
     verbose: bool,
     retries: int,
     retry_delay: float,
-    hint_mode: str = None
+    hint_mode: str = None,
 ):
-    last_exc: Optional[Exception] = None
+    last_exc = None
     for attempt in range(retries):
         try:
             judge_model = get_model_fn(task["judge_key"], task["judge_model_name"])
@@ -54,7 +55,7 @@ def run_with_retries(
                 judge_name=task["judge_key"],
                 shuffle_seed=shuffle_seed,
                 verbose=verbose,
-                hint_mode=hint_mode
+                hint_mode=hint_mode,
             )
         except Exception as exc:
             last_exc = exc
@@ -65,9 +66,7 @@ def run_with_retries(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Regenerate failed judgments.")
-    parser.add_argument(
-        "--config", default="config.yaml", help="Path to config file (default: config.yaml)"
-    )
+    parser.add_argument("--config", default="config.yaml", help="Path to config file (default: config.yaml)")
     parser.add_argument(
         "--answers",
         default="experiments/exp2_mt_bench/data/answers/answers.json",
@@ -108,11 +107,11 @@ def main() -> None:
         help="Seconds to wait between retry attempts (default: 1.0).",
     )
     parser.add_argument(
-        "--hint-mode", 
-        type=str, 
-        default=None, 
-        choices=["none", "self", "competitors", "full"],               
-        help="Hinting mode: none (blind), self (reveal own model), competitors (reveal others), full (reveal all)"
+        "--hint-mode",
+        type=str,
+        default=None,
+        choices=["none", "self", "competitors", "full"],
+        help="Hinting mode: none (blind), self (reveal own model), competitors (reveal others), full (reveal all)",
     )
     args = parser.parse_args()
 
@@ -124,9 +123,7 @@ def main() -> None:
     shuffle_seed = config.get("judging", {}).get("shuffle_seed", 42)
 
     failed_entries = [
-        (idx, entry)
-        for idx, entry in enumerate(judgments)
-        if isinstance(entry, dict) and "error" in entry
+        (idx, entry) for idx, entry in enumerate(judgments) if isinstance(entry, dict) and "error" in entry
     ]
 
     if not failed_entries:
@@ -136,15 +133,13 @@ def main() -> None:
     print(f"Found {len(failed_entries)} failed judgments. Regenerating...")
 
     model_factory = ModelFactory(config)
-    model_cache: Dict[Tuple[str, Optional[str]], Any] = {}
+    model_cache = {}
 
     def get_model(judge_key: str, model_name_override: Optional[str]):
         cache_key = (judge_key, model_name_override)
         if cache_key not in model_cache:
             vendor, tier = judge_key.split("_", 1)
-            model_cache[cache_key] = model_factory.get_model(
-                vendor, tier, model_name_override=model_name_override
-            )
+            model_cache[cache_key] = model_factory.get_model(vendor, tier, model_name_override=model_name_override)
         return model_cache[cache_key]
 
     tasks = []
@@ -180,7 +175,7 @@ def main() -> None:
 
     pbar = tqdm(total=len(tasks), desc="Regenerating judgments")
 
-    ordered_results: List[Optional[Dict[str, Any]]] = [None] * len(tasks)
+    ordered_results = [None] * len(tasks)
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_to_index = {
