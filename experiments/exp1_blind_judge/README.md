@@ -39,6 +39,7 @@
 
 <details>
 <summary><b>Quick Start</b></summary>
+
 ```bash
 cd /path/to/LLM_Eval
 
@@ -51,6 +52,5 @@ python src/judge_answers.py --config experiments/exp1_blind_judge/config.yaml --
 # Analyze
 jupyter notebook experiments/exp1_blind_judge/analysis.ipynb
 ```
-
 </details>
 

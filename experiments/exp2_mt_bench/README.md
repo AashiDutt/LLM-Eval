@@ -259,7 +259,3 @@ jupyter notebook experiments/exp2_mt_bench/analysis.ipynb
 `src/generate_answers.py` and `src/judge_answers.py` provide a bunch of useful CLI flags to ease debugging. Please run them with `-h` to see them.
 
 </details>
-
-## Cost Estimate
-- **Full run**: ~$25-30 (480 answer + 480 judge calls)
-- **Quick test**: ~$1
