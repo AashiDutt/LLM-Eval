@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Any
 
 from tqdm import tqdm
 
@@ -62,7 +62,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.config)
-    answers: List[Dict[str, Any]] = load_json(args.answers)
+    answers: list[dict[str, Any]] = load_json(args.answers)
 
     dubious_indices = [
         idx for idx, answer in enumerate(answers) if "error" in answer and answer.get("error", "")
@@ -75,7 +75,7 @@ def main() -> None:
     print(f"Found {len(dubious_indices)} dubious answers. Regenerating...")
 
     model_factory = ModelFactory(config)
-    model_cache: Dict[Tuple[str, str, str], Any] = {}
+    model_cache: dict[tuple[str, str, str], Any] = {}
 
     def get_model_instance(vendor: str, tier: str, model_name: str):
         key = (vendor, tier, model_name)
@@ -105,7 +105,7 @@ def main() -> None:
 
     pbar = tqdm(total=len(tasks), desc="Regenerating answers")
     failures = 0
-    ordered_outputs: List[Optional[str]] = [None] * len(tasks)
+    ordered_outputs = [None] * len(tasks)
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_to_index = {

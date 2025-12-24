@@ -19,7 +19,7 @@ import argparse
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 
 def load_json(path: Path) -> Any:
@@ -34,7 +34,7 @@ def dump_json(path: Path, obj: Any) -> None:
         f.write("\n")
 
 
-def key_of(entry: Dict[str, Any]) -> Tuple[str, str] | None:
+def key_of(entry: dict[str, Any]) -> tuple[str, str] | None:
     pid = entry.get("prompt_id")
     jm = entry.get("judge_model")
     if isinstance(pid, str) and isinstance(jm, str):
@@ -42,7 +42,7 @@ def key_of(entry: Dict[str, Any]) -> Tuple[str, str] | None:
     return None
 
 
-def has_error(entry: Dict[str, Any]) -> bool:
+def has_error(entry: dict[str, Any]) -> bool:
     # Treat presence of the key as error, even if it's an empty string.
     return "error" in entry and entry.get("error") is not None
 
@@ -69,7 +69,7 @@ def main() -> None:
     if not isinstance(base, list) or not isinstance(regen, list):
         raise ValueError("Expected both JSON files to be top-level lists of objects.")
 
-    regen_good: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    regen_good: dict[tuple[str, str], dict[str, Any]] = {}
     for r in regen:
         if not isinstance(r, dict):
             continue
@@ -86,7 +86,7 @@ def main() -> None:
 
     seen_keys = set()
 
-    out_list: List[Dict[str, Any]] = []
+    out_list: list[dict[str, Any]] = []
     for e in base:
         if not isinstance(e, dict):
             # preserve non-dict items as-is (rare)

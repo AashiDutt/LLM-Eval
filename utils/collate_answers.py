@@ -22,12 +22,12 @@ import argparse
 import json
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any
 
 ERROR_SUBSTR = "[ERROR: Failed to generate answer"
 
 
-JSONType = Union[Dict[str, Any], List[Any]]
+JSONType = dict[str, Any] | list[Any]
 
 
 def is_bad_answer_text(text: Any) -> bool:
@@ -54,7 +54,7 @@ def dump_json(path: Path, obj: JSONType) -> None:
         f.write("\n")
 
 
-def iter_records(data: JSONType) -> List[Dict[str, Any]]:
+def iter_records(data: JSONType) -> list[dict[str, Any]]:
     """
     Supports:
       - list[dict] (your files look like this)
@@ -69,7 +69,7 @@ def iter_records(data: JSONType) -> List[Dict[str, Any]]:
     )
 
 
-def set_records(data: JSONType, new_records: List[Dict[str, Any]]) -> JSONType:
+def set_records(data: JSONType, new_records: list[dict[str, Any]]) -> JSONType:
     if isinstance(data, list):
         return new_records
     # dict with "answers"
@@ -107,7 +107,7 @@ def main() -> None:
     answers = iter_records(answers_data)
     regen = iter_records(regen_data)
 
-    regen_by_id: Dict[str, Dict[str, Any]] = {}
+    regen_by_id: dict[str, dict[str, Any]] = {}
     for r in regen:
         aid = r.get("answer_id")
         if isinstance(aid, str):
@@ -117,7 +117,7 @@ def main() -> None:
     missing_regen = 0
     regen_not_good = 0
 
-    new_answers: List[Dict[str, Any]] = []
+    new_answers: list[dict[str, Any]] = []
     for a in answers:
         aid = a.get("answer_id")
         a_text = a.get("answer_text", "")

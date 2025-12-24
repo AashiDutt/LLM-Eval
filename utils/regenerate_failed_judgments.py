@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Tuple, Callable
+from typing import Any, Optional, Callable
 
 from tqdm import tqdm
 
@@ -26,15 +26,15 @@ from src.models import ModelFactory
 from src.judge_answers import judge_prompt_answers
 
 
-def build_answers_index(answers: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
-    answers_by_prompt: Dict[str, List[Dict[str, Any]]] = {}
+def build_answers_index(answers: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    answers_by_prompt: dict[str, list[dict[str, Any]]] = {}
     for ans in answers:
         answers_by_prompt.setdefault(ans["prompt_id"], []).append(ans)
     return answers_by_prompt
 
 
 def run_with_retries(
-    task: Dict[str, Any],
+    task: dict[str, Any],
     get_model_fn: Callable[[str, Optional[str]], Any],
     shuffle_seed: int,
     verbose: bool,
@@ -42,7 +42,7 @@ def run_with_retries(
     retry_delay: float,
     hint_mode: str = None
 ):
-    last_exc: Optional[Exception] = None
+    last_exc = None
     for attempt in range(retries):
         try:
             judge_model = get_model_fn(task["judge_key"], task["judge_model_name"])
@@ -136,7 +136,7 @@ def main() -> None:
     print(f"Found {len(failed_entries)} failed judgments. Regenerating...")
 
     model_factory = ModelFactory(config)
-    model_cache: Dict[Tuple[str, Optional[str]], Any] = {}
+    model_cache = {}
 
     def get_model(judge_key: str, model_name_override: Optional[str]):
         cache_key = (judge_key, model_name_override)
@@ -180,7 +180,7 @@ def main() -> None:
 
     pbar = tqdm(total=len(tasks), desc="Regenerating judgments")
 
-    ordered_results: List[Optional[Dict[str, Any]]] = [None] * len(tasks)
+    ordered_results = [None] * len(tasks)
 
     with ThreadPoolExecutor(max_workers=args.workers) as executor:
         future_to_index = {
