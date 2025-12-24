@@ -50,7 +50,7 @@
 
 ### 1. Self-Bias Detection Summary
 
-How often each vendor's judges rank their own vendor's answers on top, compared to the expected baseline. 
+How often each vendor's judges rank their own vendor's answers on top, compared to the expected baseline. Values are aggregated across fast and thinking tiers for each vendor family.
 
 | Judge | Self-Preference | Expected | Bias (pp) | Verdict |
 |-------|-----------------|----------|-----------|---------|
@@ -58,13 +58,15 @@ How often each vendor's judges rank their own vendor's answers on top, compared 
 | **Gemini** | 31.25% | 33.33% | +11.50 | **Mild Biased** |
 | **GPT** | 70.00% | 33.33% | +36.67 | **Most Biased** |
 
-**Self-Preference**: Percentage of times the vendor's judges rank their own vendor #1
+**Self-Preference**: Percentage of times the vendor's judges (fast + thinking combined) rank their own vendor #1
+
+**Expected**: Unbiased baseline rate of 33.33% (1/3), assuming equal probability for each of the 3 vendors to be ranked #1. While we have 6 models (2 per vendor), self-bias is calculated at the vendor level (aggregated across fast and thinking tiers), hence 3 vendors = 33.33% expected rate.
 
 **Bias (pp)**: Difference from expected in percentage points (pp = percentage points (arithmetic difference between percentages))
 
 ### 2. Cross-Judge Comparison (Top-1 Selection %)
 
-Percentage of times each judge ranks each vendor's answers as #1.  
+Percentage of times each judge ranks each vendor's answers as #1. Each judge evaluates all 6 models (claude_fast, claude_thinking, gpt_fast, gpt_thinking, gemini_fast, gemini_thinking) and ranks them. The columns show vendor-level aggregation across fast and thinking tiers.
 
 | Judge | Claude | Gemini | GPT |
 |-------|--------|--------|-----|
@@ -195,7 +197,8 @@ How often GPT answers are ranked #1 by different judges, broken down by category
 | Math | 20.0% | 40.0% | 0.0% | +20pp |
 
 *Gap = difference between GPT judge and average of other judges. Positive gap indicates GPT judge favors GPT more.*
-*Negative gap indicates GPT judge selects GPT less than other judges (e.g., Claude judge selects GPT more in STEM)
+
+*Negative gap indicates GPT judge selects GPT less than other judges (e.g., Claude judge selects GPT more in STEM)*
 
 **Domain insights:**
 - GPT self-bias is strongest in Writing and Roleplay (creative tasks).
