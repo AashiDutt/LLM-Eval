@@ -64,9 +64,7 @@ def iter_records(data: JSONType) -> list[dict[str, Any]]:
         return [x for x in data if isinstance(x, dict)]
     if isinstance(data, dict) and isinstance(data.get("answers"), list):
         return [x for x in data["answers"] if isinstance(x, dict)]
-    raise ValueError(
-        "Unsupported JSON shape. Expected a list of dicts, or a dict with an 'answers' list."
-    )
+    raise ValueError("Unsupported JSON shape. Expected a list of dicts, or a dict with an 'answers' list.")
 
 
 def set_records(data: JSONType, new_records: list[dict[str, Any]]) -> JSONType:
@@ -82,9 +80,7 @@ def set_records(data: JSONType, new_records: list[dict[str, Any]]) -> JSONType:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--answers", type=Path, required=True, help="Path to answers.json")
-    ap.add_argument(
-        "--regenerated", type=Path, required=True, help="Path to regenerated_answers.json"
-    )
+    ap.add_argument("--regenerated", type=Path, required=True, help="Path to regenerated_answers.json")
     ap.add_argument(
         "--out",
         type=Path,
@@ -157,9 +153,7 @@ def main() -> None:
         dump_json(args.out, out_data)
         print(f"Wrote patched answers to: {args.out}")
 
-    print(
-        f"Done. swapped={swapped}, missing_regen={missing_regen}, regen_not_good={regen_not_good}"
-    )
+    print(f"Done. swapped={swapped}, missing_regen={missing_regen}, regen_not_good={regen_not_good}")
 
 
 if __name__ == "__main__":

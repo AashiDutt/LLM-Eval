@@ -6,6 +6,7 @@ The script scans the judgments file for entries containing an `error` field,
 reloads the corresponding prompt + answers from the main answers file, and
 re-evaluates them with only the judge model responsible for the failure.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,7 +41,7 @@ def run_with_retries(
     verbose: bool,
     retries: int,
     retry_delay: float,
-    hint_mode: str = None
+    hint_mode: str = None,
 ):
     last_exc = None
     for attempt in range(retries):
@@ -54,7 +55,7 @@ def run_with_retries(
                 judge_name=task["judge_key"],
                 shuffle_seed=shuffle_seed,
                 verbose=verbose,
-                hint_mode=hint_mode
+                hint_mode=hint_mode,
             )
         except Exception as exc:
             last_exc = exc
@@ -65,9 +66,7 @@ def run_with_retries(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Regenerate failed judgments.")
-    parser.add_argument(
-        "--config", default="config.yaml", help="Path to config file (default: config.yaml)"
-    )
+    parser.add_argument("--config", default="config.yaml", help="Path to config file (default: config.yaml)")
     parser.add_argument(
         "--answers",
         default="experiments/exp2_mt_bench/data/answers/answers.json",
@@ -108,11 +107,11 @@ def main() -> None:
         help="Seconds to wait between retry attempts (default: 1.0).",
     )
     parser.add_argument(
-        "--hint-mode", 
-        type=str, 
-        default=None, 
-        choices=["none", "self", "competitors", "full"],               
-        help="Hinting mode: none (blind), self (reveal own model), competitors (reveal others), full (reveal all)"
+        "--hint-mode",
+        type=str,
+        default=None,
+        choices=["none", "self", "competitors", "full"],
+        help="Hinting mode: none (blind), self (reveal own model), competitors (reveal others), full (reveal all)",
     )
     args = parser.parse_args()
 
@@ -124,9 +123,7 @@ def main() -> None:
     shuffle_seed = config.get("judging", {}).get("shuffle_seed", 42)
 
     failed_entries = [
-        (idx, entry)
-        for idx, entry in enumerate(judgments)
-        if isinstance(entry, dict) and "error" in entry
+        (idx, entry) for idx, entry in enumerate(judgments) if isinstance(entry, dict) and "error" in entry
     ]
 
     if not failed_entries:
@@ -142,9 +139,7 @@ def main() -> None:
         cache_key = (judge_key, model_name_override)
         if cache_key not in model_cache:
             vendor, tier = judge_key.split("_", 1)
-            model_cache[cache_key] = model_factory.get_model(
-                vendor, tier, model_name_override=model_name_override
-            )
+            model_cache[cache_key] = model_factory.get_model(vendor, tier, model_name_override=model_name_override)
         return model_cache[cache_key]
 
     tasks = []

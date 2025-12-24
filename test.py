@@ -38,9 +38,7 @@ TEST_PROMPTS = [
 # Optional: schema for structured JSON output test
 JSON_SCHEMA = {
     "type": "object",
-    "properties": {
-        "answer_text": {"type": "string"}
-    },
+    "properties": {"answer_text": {"type": "string"}},
     "required": ["answer_text"],
     "additionalProperties": False,
 }
@@ -118,7 +116,9 @@ def call_gemini(
             # This is intentionally the old risky call
             text = resp.text  # may raise if no valid Part
             dbg = {
-                "finish_reason": getattr(resp.candidates[0], "finish_reason", None) if getattr(resp, "candidates", None) else None
+                "finish_reason": getattr(resp.candidates[0], "finish_reason", None)
+                if getattr(resp, "candidates", None)
+                else None
             }
         else:
             text, dbg = safe_extract_text_from_parts(resp)
@@ -167,6 +167,7 @@ def main():
         raise RuntimeError("Set GOOGLE_API_KEY first")
 
     from google import genai  # pip install google-genai
+
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
 
     models = [
@@ -185,6 +186,7 @@ def main():
             return 1.0, 2048
 
     summary = {}  # (model_label, mode) -> counters
+
     def bump(key, field):
         summary.setdefault(key, {})
         summary[key][field] = summary[key].get(field, 0) + 1

@@ -13,14 +13,10 @@ class ModelWrapper:
         self.api_key = api_key
         self.model_name = model_name
         self.config = config
-        self.timeout = config.get('generation', {}).get('timeout', 60)
-    
+        self.timeout = config.get("generation", {}).get("timeout", 60)
+
     def generate(
-        self,
-        prompt: str,
-        system_prompt: str = None,
-        response_model: Type[BaseModel] = None,
-        **kwargs
+        self, prompt: str, system_prompt: str = None, response_model: Type[BaseModel] = None, **kwargs
     ) -> Any:
         raise NotImplementedError
 
@@ -33,33 +29,33 @@ class ModelWrapper:
         """
         if isinstance(schema, dict):
             schema = schema.copy()
-            
+
             if "$ref" in schema:
                 if "description" in schema:
                     schema.pop("description")
-            
+
             if schema.get("type") == "object" and "additionalProperties" not in schema:
                 schema["additionalProperties"] = False
-            
+
             if "$defs" in schema:
                 schema["$defs"] = {
                     def_name: ModelWrapper._patch_json_schema_for_openai(def_schema)
                     for def_name, def_schema in schema["$defs"].items()
                 }
-            
+
             if "properties" in schema:
                 schema["properties"] = {
                     prop_name: ModelWrapper._patch_json_schema_for_openai(prop_schema)
                     for prop_name, prop_schema in schema["properties"].items()
                 }
-            
+
             for key, value in schema.items():
                 if key not in ("additionalProperties", "$defs", "properties", "$ref", "description"):
                     schema[key] = ModelWrapper._patch_json_schema_for_openai(value)
-        
+
         elif isinstance(schema, list):
             schema = [ModelWrapper._patch_json_schema_for_openai(item) for item in schema]
-        
+
         return schema
 
     @staticmethod
@@ -81,9 +77,7 @@ class ModelWrapper:
             elif isinstance(payload, str):
                 response_model.model_validate_json(payload)
             else:
-                raise ValueError(
-                    f"Unsupported structured payload type: {type(payload)}"
-                )
+                raise ValueError(f"Unsupported structured payload type: {type(payload)}")
 
             # ---- success: always return string ----
             if isinstance(payload, BaseModel):
@@ -104,29 +98,25 @@ class ClaudeWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         super().__init__(api_key, model_name, config)
         self.client = Anthropic(api_key=api_key)
-    
+
     def generate(
-        self,
-        prompt: str,
-        system_prompt: str = None,
-        response_model: Type[BaseModel] = None,
-        **kwargs
+        self, prompt: str, system_prompt: str = None, response_model: Type[BaseModel] = None, **kwargs
     ) -> Any:
-        temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
-        max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
+        temperature = kwargs.get("temperature", self.config.get("generation", {}).get("temperature", 0.7))
+        max_tokens = kwargs.get("max_tokens", self.config.get("generation", {}).get("max_tokens", 2048))
 
         kwargs = {
-            "model": self.model_name, "max_tokens": max_tokens, "temperature": temperature,
-            "messages": [{"role": "user", "content": prompt}]
+            "model": self.model_name,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": [{"role": "user", "content": prompt}],
         }
         if system_prompt is not None:
             kwargs["system"] = system_prompt
         try:
             if response_model is not None:
                 try:
-                    kwargs.update(
-                        {"betas": self.STRUCTURED_OUTPUTS_BETA, "output_format": response_model}
-                    )
+                    kwargs.update({"betas": self.STRUCTURED_OUTPUTS_BETA, "output_format": response_model})
                     response = self.client.beta.messages.parse(**kwargs)
                     return self._coerce_structured_response(response.parsed_output, response_model)
                 except Exception as structured_error:
@@ -145,13 +135,10 @@ class GPTWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         super().__init__(api_key, model_name, config)
         openai_models = config.get("models")["gpt"]
-        self.use_openrouter_for_openai = all(
-            openai_models[tier].startswith("openai/") for tier in openai_models
-        )
+        self.use_openrouter_for_openai = all(openai_models[tier].startswith("openai/") for tier in openai_models)
 
         self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1" if self.use_openrouter_for_openai else None
+            api_key=api_key, base_url="https://openrouter.ai/api/v1" if self.use_openrouter_for_openai else None
         )
 
     @staticmethod
@@ -163,17 +150,13 @@ class GPTWrapper(ModelWrapper):
         return messages
 
     def _call_native_openai(
-        self,
-        messages: list[dict[str, str]],
-        temperature: float,
-        max_tokens: int,
-        response_model: Type[BaseModel]
+        self, messages: list[dict[str, str]], temperature: float, max_tokens: int, response_model: Type[BaseModel]
     ) -> Any:
         is_gpt5 = "gpt-5" in self.model_name
         request_kwargs = {"model": self.model_name, "messages": messages}
         if not is_gpt5:
             request_kwargs["temperature"] = temperature
-        
+
         if response_model is not None:
             try:
                 request_kwargs["max_output_tokens"] = max_tokens
@@ -184,7 +167,7 @@ class GPTWrapper(ModelWrapper):
             except Exception as structured_error:
                 print(f"Structured OpenAI output failed ({self.model_name}): {structured_error}")
                 raise
-        
+
         request_kwargs["max_completion_tokens"] = max_tokens
         response = self.client.chat.completions.create(**request_kwargs)
         message_content = response.choices[0].message.content
@@ -193,16 +176,12 @@ class GPTWrapper(ModelWrapper):
         else:
             text = message_content or ""
         return text
-    
+
     def generate(
-        self,
-        prompt: str,
-        system_prompt: str = None,
-        response_model: Type[BaseModel] = None,
-        **kwargs
+        self, prompt: str, system_prompt: str = None, response_model: Type[BaseModel] = None, **kwargs
     ) -> Any:
-        temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
-        max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
+        temperature = kwargs.get("temperature", self.config.get("generation", {}).get("temperature", 0.7))
+        max_tokens = kwargs.get("max_tokens", self.config.get("generation", {}).get("max_tokens", 2048))
         messages = self._build_messages(system_prompt, prompt)
 
         if not self.use_openrouter_for_openai:
@@ -214,7 +193,7 @@ class GPTWrapper(ModelWrapper):
                 "messages": messages,
                 "extra_headers": {
                     "HTTP-Referer": "https://github.com/llm-bias-eval",
-                    "X-Title": "LLM Bias Evaluation"
+                    "X-Title": "LLM Bias Evaluation",
                 },
             }
             request_kwargs.update({"max_tokens": max_tokens})
@@ -233,7 +212,7 @@ class GPTWrapper(ModelWrapper):
                         "strict": True,
                     },
                 }
-            
+
             response = self.client.chat.completions.create(**request_kwargs)
             message_content = response.choices[0].message.content
             if isinstance(message_content, list):
@@ -251,17 +230,17 @@ class GPTWrapper(ModelWrapper):
 class GeminiWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         super().__init__(api_key, model_name, config)
-        
+
         self.safety_settings = [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
         ]
-        
+
         self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
-    
+
     def generate(
         self,
         prompt: str,
@@ -336,11 +315,7 @@ class GeminiWrapper(ModelWrapper):
             if part_text:
                 return part_text
 
-        finish_reason = (
-            candidates[0].finish_reason
-            if candidates
-            else "No candidates"
-        )
+        finish_reason = candidates[0].finish_reason if candidates else "No candidates"
         raise ValueError(f"Empty response. Finish reason: {finish_reason}")
 
     def _generate_structured_with_optional_repair(
@@ -374,23 +349,19 @@ class GeminiWrapper(ModelWrapper):
 class OpenRouterWrapper(ModelWrapper):
     def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         super().__init__(api_key, model_name, config)
-        
-        self.client = OpenAI(
-            api_key=api_key,
-            base_url="https://openrouter.ai/api/v1"
-        )
-    
+
+        self.client = OpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+
     def generate(
-        self,
-        prompt: str,
-        system_prompt: str = None,
-        response_model: Type[BaseModel] = None,
-        **kwargs
+        self, prompt: str, system_prompt: str = None, response_model: Type[BaseModel] = None, **kwargs
     ) -> Any:
-        temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
-        max_tokens = kwargs.get('max_tokens', self.config.get('generation', {}).get('max_tokens', 2048))
-        retries = kwargs.get('retries', 3)
-        system_message = system_prompt or "You are a helpful assistant. Always respond with valid JSON only, no markdown formatting."
+        temperature = kwargs.get("temperature", self.config.get("generation", {}).get("temperature", 0.7))
+        max_tokens = kwargs.get("max_tokens", self.config.get("generation", {}).get("max_tokens", 2048))
+        retries = kwargs.get("retries", 3)
+        system_message = (
+            system_prompt
+            or "You are a helpful assistant. Always respond with valid JSON only, no markdown formatting."
+        )
         response_format = None
         if response_model is not None:
             raw_schema = response_model.model_json_schema()
@@ -405,16 +376,13 @@ class OpenRouterWrapper(ModelWrapper):
             }
         base_payload = {
             "model": self.model_name,
-            "messages": [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": prompt}
-            ],
+            "messages": [{"role": "system", "content": system_message}, {"role": "user", "content": prompt}],
             "temperature": temperature,
-            "max_tokens": max_tokens
+            "max_tokens": max_tokens,
         }
         if response_format:
             base_payload["response_format"] = response_format
-        
+
         for attempt in range(retries):
             try:
                 response = self.client.chat.completions.create(**base_payload)
@@ -441,17 +409,17 @@ class OpenRouterWrapper(ModelWrapper):
 
 
 class ModelFactory:
-    VALID_VENDORS = ('claude', 'gpt', 'gemini')
-    VALID_TIERS = ('fast', 'thinking')
+    VALID_VENDORS = ("claude", "gpt", "gemini")
+    VALID_TIERS = ("fast", "thinking")
     VENDOR_WRAPPERS = {
-        'claude': ('ANTHROPIC_API_KEY', 'anthropic', ClaudeWrapper),
-        'gpt': ('OPENROUTER_API_KEY', 'openrouter', GPTWrapper),
+        "claude": ("ANTHROPIC_API_KEY", "anthropic", ClaudeWrapper),
+        "gpt": ("OPENROUTER_API_KEY", "openrouter", GPTWrapper),
     }
 
     def __init__(self, config: dict[str, Any]):
         self.config = config
-        self.api_keys = config.get('api_keys', {})
-        self.models_config = config.get('models', {})
+        self.api_keys = config.get("api_keys", {})
+        self.models_config = config.get("models", {})
 
     def _get_api_key(self, env_var: str, config_key: str) -> str:
         return os.environ.get(env_var) or self.api_keys.get(config_key)
@@ -459,13 +427,13 @@ class ModelFactory:
     def get_model(self, vendor: str, tier: str, model_name_override: str = None) -> ModelWrapper:
         vendor = vendor.lower()
         tier = tier.lower()
-        
+
         if vendor not in self.VALID_VENDORS:
             raise ValueError(f"Unknown vendor: {vendor}")
-        
+
         if tier not in self.VALID_TIERS:
             raise ValueError(f"Unknown tier: {tier}")
-        
+
         if vendor in self.VENDOR_WRAPPERS:
             env_var, key_name, wrapper_cls = self.VENDOR_WRAPPERS[vendor]
             api_key = self._get_api_key(env_var, key_name)
@@ -474,21 +442,21 @@ class ModelFactory:
             if not model_name:
                 raise KeyError(f"Missing model config for {vendor}.{tier}")
             return wrapper_cls(api_key, model_name, self.config)
-        
-        gemini_models = self.models_config.get('gemini', {})
+
+        gemini_models = self.models_config.get("gemini", {})
         model_name = model_name_override or gemini_models.get(tier)
         if not model_name:
             raise KeyError(f"Missing model config for gemini.{tier}")
-        if model_name.startswith('google/'):
-            api_key = self._get_api_key('OPENROUTER_API_KEY', 'openrouter')
+        if model_name.startswith("google/"):
+            api_key = self._get_api_key("OPENROUTER_API_KEY", "openrouter")
             return OpenRouterWrapper(api_key, model_name, self.config)
-        api_key = self._get_api_key('GOOGLE_API_KEY', 'google')
+        api_key = self._get_api_key("GOOGLE_API_KEY", "google")
         return GeminiWrapper(api_key, model_name, self.config)
-    
+
     def get_all_models(self) -> dict[str, ModelWrapper]:
         models = {}
-        for vendor in ['claude', 'gpt', 'gemini']:
-            for tier in ['fast', 'thinking']:
+        for vendor in ["claude", "gpt", "gemini"]:
+            for tier in ["fast", "thinking"]:
                 key = f"{vendor}_{tier}"
                 models[key] = self.get_model(vendor, tier)
         return models
