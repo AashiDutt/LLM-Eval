@@ -58,7 +58,7 @@ How often each vendor's judges rank their own vendor's answers on top, compared 
 | **Gemini** | 31.25% | 33.33% | +11.50 | **Mild Biased** |
 | **GPT** | 70.00% | 33.33% | +36.67 | **Most Biased** |
 
-**Self-Preference**: Percentage of times the vendor's judges rank their own vendor #1
+**Self-Preference**: Percentage of times the vendor's judges rank their own vendor as #1
 
 **Bias (pp)**: Difference from expected in percentage points (pp = percentage points (arithmetic difference between percentages))
 
@@ -145,12 +145,12 @@ The percentage of times thinking-tier vs fast-tier models are ranked #1 across a
 | GPT | 26.5% | **73.5%** |
 
 > [!NOTE]
-> All vendors' Thinking tier models preferred over Fast tier*
+> All vendors' Thinking tier models preferred over Fast tier
 
 ---
 
 <details>
-<summary><b>Key Findings</b></summary>
+<summary><b>Unravel for additional commentaries</b></summary>
 
 ### Overall Self-Bias Patterns
 
@@ -214,7 +214,7 @@ How often GPT answers are ranked #1 by different judges, broken down by category
 </details>
 
 <details>
-<summary><b>Quick Start</b></summary>
+<summary><b>Run the scripts</b></summary>
 
 ```bash
 cd /path/to/LLM_Eval

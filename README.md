@@ -51,6 +51,11 @@ LLM_Eval/
 | 4 | Fast vs Thinking | Tier preference patterns?  | All vendors prefer thinking-tier |
 | 5 | Family Loyalty | Same-vendor preference? | Cross-vendor patterns identified |
 
+**Notes**:
+
+* Experiment 1 is a baby experiment that helped us gain intuition and decide the next steps of the project.
+* Experiment 3 was conducted with MT-Bench.
+
 <details>
 <summary><b>Quick Start</b></summary>
 
