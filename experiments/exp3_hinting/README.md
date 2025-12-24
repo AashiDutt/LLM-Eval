@@ -54,7 +54,11 @@
 | **Group 3** | `full` | All models revealed | Full transparency |
 | **Group 4** | `none` | No hints (blind) | Baseline control |
 
+> **Note**: Group 4 (`none`) is essentially **Experiment 2** - it uses the same blind judgment protocol with no model identity hints. The judgments are reused from Experiment 2's results.
+
 ## Main Metrics Comparison
+
+We compared the four hinting groups across key fairness metrics. Best column indicates which group performs best for each metric (lower is better for all metrics).
 
 | Metric | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) | Best |
 |--------|----------------|----------------------|----------------|-----------------|------|
@@ -63,9 +67,12 @@
 | **Balance Score** | 15.50 | 14.96 | 13.10 | 14.07 | Group 3 |
 | **Consistency** | 15.57 | 16.11 | 14.00 | 15.52 | Group 3 |
 
+*pp = percentage points (arithmetic difference between percentages)*
 *Note: Lower values are better for all metrics. Expected self-bias = 33.33% (3 vendors, unbiased)*
 
 ## Vendor-Specific Self-Bias Rates
+
+Self-bias rates for each vendor across different hinting groups, aggregated across fast and thinking tiers. Values show the percentage of times each vendor's judges rank their own vendor's answers as #1.
 
 | Vendor | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) |
 |--------|----------------|----------------------|----------------|-----------------|
@@ -73,9 +80,11 @@
 | **GPT** | 62.5% | 65.6% | 63.7% | 64.4% |
 | **Gemini** | 35.6% | 28.1% | 33.8% | 33.1% |
 
-*Self-bias rate = percentage of times a judge ranks their own vendor #1*
+*Self-bias rate = percentage of times a judge ranks their own vendor #1 (aggregated across fast and thinking tiers)*
 
 ## Domain-wise Best Group
+
+Average self-bias rates by category for each hinting group, aggregated across all vendors and tiers. Best Group column indicates which hinting mode produces the lowest self-bias for that category.
 
 | Category | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) | Best Group |
 |----------|----------------|----------------------|----------------|-----------------|------------|
@@ -88,9 +97,11 @@
 | Roleplay | 55.0% | 55.0% | 61.7% | **53.3%** | **Group 4** |
 | STEM | 36.7% | **33.3%** | 43.3% | 36.7% | **Group 2** |
 
-*Best = lowest average self-bias across all vendors for that category*
+*Best = lowest average self-bias across all vendors for that category (aggregated across fast and thinking tiers)*
 
 ## Goal-Based Recommendations
+
+Here are recommendations for selecting a hinting group based on different research or production goals. 
 
 | Goal | Recommended Group | Rationale | Trade-offs |
 |------|------------------|-----------|------------|
@@ -101,7 +112,9 @@
 
 *Note: "33.33%" is a naive uniform baseline (3 vendors). Real-world "unbiased" rates can differ due to answer quality, prompt mix, and judge preference for style.*
 
-## How to Run
+
+<details>
+<summary><b>Quick Start</b></summary>
 
 ```bash
 cd /path/to/LLM_Eval
@@ -127,9 +140,7 @@ python src/judge_answers.py \
   --output experiments/exp3_hinting/data/judgments/group3_full.json \
   --hint-mode full
 
-# Group 4: Baseline (symlink to exp2)
-ln -s ../../exp2_mt_bench/data/judgments/judgments_mt_bench.json \
-  experiments/exp3_hinting/data/judgments/group4_blind.json
+# Group 4: Baseline (reuse exp2 results data)
 ```
 
 ### Quick Test (5 prompts, 1 judge)
@@ -147,3 +158,5 @@ python src/judge_answers.py \
 ```bash
 jupyter notebook experiments/exp3_hinting/analysis.ipynb
 ```
+
+</details>

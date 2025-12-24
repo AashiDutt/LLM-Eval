@@ -36,15 +36,9 @@
 2. **Claude answers are genuinely preferred**: Both Gemini and Claude judges ranked Claude #1 at 60%
 3. **Gemini is impartial**: Only ranked itself #1 at 20% (below expected 33%)
 
-## Files
-- `config.yaml` - Model configuration used
-- `prompts.json` - 60 test prompts
-- `analysis.ipynb` - Analysis notebook
-- `data/answers/` - Generated model answers
-- `data/judgments/` - Judge evaluations
-- `data/results/` - Visualizations and CSVs
 
-## How to Reproduce
+<details>
+<summary><b>Quick Start</b></summary>
 ```bash
 cd /path/to/LLM_Eval
 
@@ -57,4 +51,6 @@ python src/judge_answers.py --config experiments/exp1_blind_judge/config.yaml --
 # Analyze
 jupyter notebook experiments/exp1_blind_judge/analysis.ipynb
 ```
+
+</details>
 

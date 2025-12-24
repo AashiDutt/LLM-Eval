@@ -39,7 +39,7 @@
 | GPT | GPT-5-mini | GPT-5.2 |
 | Gemini | 2.5 Flash | 3 Pro Preview |
 
-### Judges (6 total)
+### Judges
 - `claude_fast`, `claude_thinking`
 - `gpt_fast`, `gpt_thinking`
 - `gemini_fast`, `gemini_thinking`
@@ -50,15 +50,20 @@
 
 ### 1. Self-Bias Detection Summary
 
+How often each vendor's judges rank their own vendor's answers on top, compared to the expected baseline. 
+
 | Judge | Self-Preference | Expected | Bias (pp) | Verdict |
 |-------|-----------------|----------|-----------|---------|
-| **Claude** | 32.50% | 33.33% | +8.75 | ✅ **LEAST BIASED** |
-| **Gemini** | 31.25% | 33.33% | +11.50 | ⚠️ Mild bias |
-| **GPT** | 70.00% | 33.33% | +36.67 | ❌ **MOST BIASED** |
+| **Claude** | 32.50% | 33.33% | +8.75 | **Least Biased** |
+| **Gemini** | 31.25% | 33.33% | +11.50 | **Mild Biased** |
+| **GPT** | 70.00% | 33.33% | +36.67 | **Most Biased** |
 
 *pp = percentage points (arithmetic difference between percentages)*
+*Columns = self-preference rate, expected unbiased rate (33.33%), bias difference in percentage points, and verdict.*
 
 ### 2. Cross-Judge Comparison (Top-1 Selection %)
+
+Percentage of times each judge ranks each vendor's answers as #1.  
 
 | Judge | Claude | Gemini | GPT |
 |-------|--------|--------|-----|
@@ -69,7 +74,11 @@
 | gpt_fast | 21.25 | 20.00 | **58.75** |
 | gpt_thinking | 21.25 | 8.75 | **70.00** |
 
-### 3. Average Scores by Vendor & Tier (Gemini Judge)
+*Bold values indicate self-preference (judge ranking their own vendor).*
+
+### 3. Average Scores by Vendor & Tier 
+
+Average scores (0-10 scale) given by Gemini Thinking judge to each vendor's fast vs thinking tier models. 
 
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
@@ -77,7 +86,28 @@
 | Gemini | 6.01 ± 3.41 | 7.55 ± 2.75 |
 | GPT | 7.05 ± 3.26 | **8.47 ± 2.21** |
 
-### 4. Category-wise Preferences (Gemini Judge)
+*Bold indicates highest score. Standard deviation shows score variability across 80 prompts (single run)*
+
+### 4. Category-wise Preferences by Judge Family
+
+Which vendor's answers are ranked #1 most often in each category, broken down by judge family.  
+
+*Winner column shows the dominant vendor per category.*
+
+#### 4a. Claude Judges
+
+| Category | Claude | Gemini | GPT | Winner |
+|----------|--------|--------|-----|--------|
+| Coding | 35% | 5% | **60%** | GPT |
+| Extraction | **40%** | 25% | 35% | Claude |
+| Humanities | 20% | 5% | **75%** | GPT |
+| Math | 35% | **40%** | 25% | Gemini |
+| Reasoning | 40% | **45%** | 15% | Gemini |
+| Roleplay | 30% | 10% | **60%** | GPT |
+| STEM | 10% | 10% | **80%** | GPT |
+| Writing | 30% | 0% | **70%** | GPT |
+
+#### 4b. Gemini Thinking Judge
 
 | Category | Claude | Gemini | GPT | Winner |
 |----------|--------|--------|-----|--------|
@@ -90,7 +120,22 @@
 | STEM | 30% | 0% | **70%** | GPT |
 | Writing | 30% | 20% | **50%** | GPT |
 
+#### 4c. GPT Judges 
+
+| Category | Claude | Gemini | GPT | Winner |
+|----------|--------|--------|-----|--------|
+| Coding | 15% | 10% | **75%** | GPT |
+| Extraction | 40% | 5% | **55%** | GPT |
+| Humanities | 20% | 10% | **70%** | GPT |
+| Math | 25% | **40%** | 35% | Gemini |
+| Reasoning | **45%** | 30% | 25% | Claude |
+| Roleplay | 5% | 10% | **85%** | GPT |
+| STEM | 10% | 10% | **80%** | GPT |
+| Writing | 10% | 0% | **90%** | GPT |
+
 ### 5. Tier Preference (Thinking vs Fast)
+
+The percentage of times thinking-tier vs fast-tier models are ranked #1 across all judges.
 
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
@@ -103,7 +148,8 @@
 
 ---
 
-## Key Findings 🔎
+<details>
+<summary><b>Key Findings</b></summary>
 
 ### Overall Self-Bias Patterns
 
@@ -135,6 +181,9 @@
 
 #### Self-Bias by Category
 
+Self-bias rates for each vendor broken down by category, aggregated across fast and thinking tiers. 
+*Columns indicate percentage of times each vendor's judges (fast + thinking combined) rank their own vendor #1 in that category.*
+
 | Category | GPT Self-Bias | Claude Self-Bias | Gemini Self-Bias |
 |----------|---------------|------------------|------------------|
 | Writing | **90.0%** | 30.0% | 15.0% |
@@ -153,6 +202,8 @@
 
 #### Cross-Judge GPT Selection by Category
 
+How often GPT answers are ranked #1 by different judges, broken down by category.
+
 | Category | GPT Judge | Claude Judge | Gemini Judge | Gap |
 |----------|-----------|--------------|--------------|-----|
 | Writing | 90.0% | 70.0% | 50.0% | +40pp |
@@ -164,6 +215,7 @@
 | Reasoning | 30.0% | 30.0% | 10.0% | +20pp |
 | Math | 20.0% | 40.0% | 0.0% | +20pp |
 
+*Gap = difference between GPT judge and average of other judges. Positive gap indicates GPT judge favors GPT more.*
 *Negative gap indicates GPT judge selects GPT less than other judges (e.g., Claude judge selects GPT more in STEM)
 
 **Domain insights:**
@@ -180,19 +232,10 @@
 
 **Cross-judge agreement indicates quality**: When multiple judges agree on a winner (e.g., GPT in Writing, Gemini in Math), it suggests genuine domain-specific strengths rather than just judge favoritism.
 
----
+</details>
 
-## Hypotheses Evaluation
-
-| Hypothesis | Result |
-|------------|--------|
-| Bias stronger in subjective domains | ⚠️ Mixed - Gemini biased in Math/Reasoning (objective) |
-| GPT self-bias varies by domain | ✅ Confirmed - GPT bias consistent across domains |
-| Technical tasks show different patterns | ✅ Confirmed - Gemini excels in Math/Reasoning |
-
----
-
-## How to Run
+<details>
+<summary><b>Quick Start</b></summary>
 
 ```bash
 cd /path/to/LLM_Eval
@@ -214,6 +257,8 @@ jupyter notebook experiments/exp2_mt_bench/analysis.ipynb
 ```
 
 `src/generate_answers.py` and `src/judge_answers.py` provide a bunch of useful CLI flags to ease debugging. Please run them with `-h` to see them.
+
+</details>
 
 ## Cost Estimate
 - **Full run**: ~$25-30 (480 answer + 480 judge calls)

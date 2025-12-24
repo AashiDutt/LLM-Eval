@@ -46,8 +46,8 @@ LLM_Eval/
 | 4 | Fast vs Thinking | Tier preference patterns?  | All vendors prefer thinking-tier |
 | 5 | Family Loyalty | Same-vendor preference? | Cross-vendor patterns identified |
 
-## Quick Start
-
+<details>
+<summary><b>Quick Start</b></summary>
 ### Setup
 ```bash
 python3 -m venv venv
@@ -63,7 +63,8 @@ OPENAI_API_KEY=your_key
 GOOGLE_API_KEY=your_key
 ```
 
-### Run an Experiment
+### Run Experiment 1
+
 ```bash
 # Generate answers
 python src/generate_answers.py \
@@ -81,7 +82,27 @@ python src/judge_answers.py \
 jupyter notebook experiments/exp1_blind_judge/analysis.ipynb
 ```
 
+### Run Experiment 2
+
+```bash
+# Generate answers
+python src/generate_answers.py \
+  --config experiments/exp2_mt_bench/config.yaml \
+  --prompts experiments/exp2_mt_bench/prompts.json \
+  --output experiments/exp2_mt_bench/data/answers/answers.json
+
+# Judge answers 
+python src/judge_answers.py \
+  --config experiments/exp2_mt_bench/config.yaml \
+  --answers experiments/exp2_mt_bench/data/answers/answers.json \
+  --output experiments/exp2_mt_bench/data/judgments/judgments.json
+
+# Analyze
+jupyter notebook experiments/exp2_mt_bench/analysis.ipynb
+```
+
 ### Run Experiment 3: Hinting Effect
+
 ```bash
 # Run all hinting groups
 python src/judge_answers.py \
@@ -93,8 +114,10 @@ python src/judge_answers.py \
 # Analyze all groups
 jupyter notebook experiments/exp3_hinting/analysis.ipynb
 ```
+</details>
 
-## Key Findings
+<details>
+<summary><b>Key Findings</b></summary>
 
 ### Experiment 1: Blind Judge
 | Judge | Picks Own Vendor | Others Pick Same | Self-Bias? |
@@ -119,6 +142,17 @@ Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
 - **GPT**: Persistent high bias (62-66%) regardless of hinting condition
 - **Claude**: Shows self-awareness when identity revealed (25.6% self-bias)
 - **Recommendation**: Use **Group 3 (Full transparency)** for best balance and fairness
+
+</details>
+
+## Acknowledgment
+
+<div align="center">
+  <img src="google.png" alt="Google" height="60" style="margin-right: 20px;">
+  <img src="hf-logo.png" alt="Hugging Face" height="60">
+</div>
+
+Developed during Google's ML Developer Programs AI Sprint 2025 H2, this project benefited from generous GCP credits that facilitated its completion. We express our gratitude to the MLDP team for the support provided.
 
 ## 📄 License
 
