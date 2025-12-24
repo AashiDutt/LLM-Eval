@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Any, Dict, Optional, Type
+from typing import Any, Type
 import json
 import google.genai as genai
 from anthropic import Anthropic
@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 
 class ModelWrapper:
-    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+    def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         self.api_key = api_key
         self.model_name = model_name
         self.config = config
@@ -18,14 +18,14 @@ class ModelWrapper:
     def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
-        response_model: Optional[Type[BaseModel]] = None,
+        system_prompt: str = None,
+        response_model: Type[BaseModel] = None,
         **kwargs
     ) -> Any:
         raise NotImplementedError
 
     @staticmethod
-    def _patch_json_schema_for_openai(schema: Dict[str, Any]) -> Dict[str, Any]:
+    def _patch_json_schema_for_openai(schema: dict[str, Any]) -> dict[str, Any]:
         """
         Recursively patch JSON schema for OpenAI/OpenRouter strict mode:
         - Add additionalProperties: false to all object schemas
@@ -65,7 +65,7 @@ class ModelWrapper:
     @staticmethod
     def _coerce_structured_response(
         payload: Any,
-        response_model: Optional[Type[BaseModel]],
+        response_model: Type[BaseModel],
     ) -> str:
         if response_model is None:
             return payload if isinstance(payload, str) else str(payload)
@@ -101,15 +101,15 @@ class ClaudeWrapper(ModelWrapper):
     # https://platform.claude.com/docs/en/build-with-claude/structured-outputs
     STRUCTURED_OUTPUTS_BETA = ["structured-outputs-2025-11-13"]
 
-    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+    def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         super().__init__(api_key, model_name, config)
         self.client = Anthropic(api_key=api_key)
     
     def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
-        response_model: Optional[Type[BaseModel]] = None,
+        system_prompt: str = None,
+        response_model: Type[BaseModel] = None,
         **kwargs
     ) -> Any:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
@@ -142,7 +142,7 @@ class ClaudeWrapper(ModelWrapper):
 
 
 class GPTWrapper(ModelWrapper):
-    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+    def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         super().__init__(api_key, model_name, config)
         openai_models = config.get("models")["gpt"]
         self.use_openrouter_for_openai = all(
@@ -155,7 +155,7 @@ class GPTWrapper(ModelWrapper):
         )
 
     @staticmethod
-    def _build_messages(system_prompt: Optional[str], prompt: str) -> list[dict[str, str]]:
+    def _build_messages(system_prompt: str, prompt: str) -> list[dict[str, str]]:
         messages: list[dict[str, str]] = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -167,7 +167,7 @@ class GPTWrapper(ModelWrapper):
         messages: list[dict[str, str]],
         temperature: float,
         max_tokens: int,
-        response_model: Optional[Type[BaseModel]]
+        response_model: Type[BaseModel]
     ) -> Any:
         is_gpt5 = "gpt-5" in self.model_name
         request_kwargs = {"model": self.model_name, "messages": messages}
@@ -197,8 +197,8 @@ class GPTWrapper(ModelWrapper):
     def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
-        response_model: Optional[Type[BaseModel]] = None,
+        system_prompt: str = None,
+        response_model: Type[BaseModel] = None,
         **kwargs
     ) -> Any:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
@@ -249,7 +249,7 @@ class GPTWrapper(ModelWrapper):
 
 
 class GeminiWrapper(ModelWrapper):
-    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+    def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         super().__init__(api_key, model_name, config)
         
         self.safety_settings = [
@@ -265,8 +265,8 @@ class GeminiWrapper(ModelWrapper):
     def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
-        response_model: Optional[Type[BaseModel]] = None,
+        system_prompt: str = None,
+        response_model: Type[BaseModel] = None,
         **kwargs,
     ) -> Any:
         temperature = kwargs.get("temperature", self.config.get("generation", {}).get("temperature", 0.7))
@@ -299,12 +299,12 @@ class GeminiWrapper(ModelWrapper):
     def _build_gen_config(
         self,
         *,
-        system_prompt: Optional[str],
+        system_prompt: str = None,
         temperature: float,
         max_tokens: int,
-        response_model: Optional[Type[BaseModel]],
+        response_model: Type[BaseModel] = None,
     ) -> genai.types.GenerateContentConfig:
-        cfg: Dict[str, Any] = {
+        cfg: dict[str, Any] = {
             "system_instruction": system_prompt,
             "temperature": temperature,
             "max_output_tokens": max_tokens,
@@ -372,7 +372,7 @@ class GeminiWrapper(ModelWrapper):
 
 
 class OpenRouterWrapper(ModelWrapper):
-    def __init__(self, api_key: str, model_name: str, config: Dict[str, Any]):
+    def __init__(self, api_key: str, model_name: str, config: dict[str, Any]):
         super().__init__(api_key, model_name, config)
         
         self.client = OpenAI(
@@ -383,8 +383,8 @@ class OpenRouterWrapper(ModelWrapper):
     def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
-        response_model: Optional[Type[BaseModel]] = None,
+        system_prompt: str = None,
+        response_model: Type[BaseModel] = None,
         **kwargs
     ) -> Any:
         temperature = kwargs.get('temperature', self.config.get('generation', {}).get('temperature', 0.7))
@@ -448,7 +448,7 @@ class ModelFactory:
         'gpt': ('OPENROUTER_API_KEY', 'openrouter', GPTWrapper),
     }
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         self.config = config
         self.api_keys = config.get('api_keys', {})
         self.models_config = config.get('models', {})
@@ -456,7 +456,7 @@ class ModelFactory:
     def _get_api_key(self, env_var: str, config_key: str) -> str:
         return os.environ.get(env_var) or self.api_keys.get(config_key)
 
-    def get_model(self, vendor: str, tier: str, model_name_override: Optional[str] = None) -> ModelWrapper:
+    def get_model(self, vendor: str, tier: str, model_name_override: str = None) -> ModelWrapper:
         vendor = vendor.lower()
         tier = tier.lower()
         
@@ -485,7 +485,7 @@ class ModelFactory:
         api_key = self._get_api_key('GOOGLE_API_KEY', 'google')
         return GeminiWrapper(api_key, model_name, self.config)
     
-    def get_all_models(self) -> Dict[str, ModelWrapper]:
+    def get_all_models(self) -> dict[str, ModelWrapper]:
         models = {}
         for vendor in ['claude', 'gpt', 'gemini']:
             for tier in ['fast', 'thinking']:

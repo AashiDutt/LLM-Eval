@@ -4,11 +4,11 @@ import yaml
 import random
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Any
 from dotenv import load_dotenv
 
 
-def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
+def load_config(config_path: str = "config.yaml") -> dict[str, Any]:
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     
@@ -23,7 +23,7 @@ def load_config(config_path: str = "config.yaml") -> Dict[str, Any]:
     return config
 
 
-def load_prompts(prompts_path: str = "prompts.json") -> List[Dict[str, Any]]:
+def load_prompts(prompts_path: str = "prompts.json") -> list[dict[str, Any]]:
     with open(prompts_path, 'r') as f:
         data = json.load(f)
     return data['prompts']
@@ -44,7 +44,7 @@ def generate_timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
-def anonymize_and_shuffle(answers: List[Dict[str, Any]], seed: Optional[int] = None) -> tuple:
+def anonymize_and_shuffle(answers: list[dict[str, Any]], seed: int = None) -> tuple:
     if seed is not None:
         random.seed(seed)
     
@@ -70,11 +70,11 @@ def anonymize_and_shuffle(answers: List[Dict[str, Any]], seed: Optional[int] = N
 
 def format_judge_prompt(
     question: str, 
-    anonymized_answers: List[Dict[str, str]],
+    anonymized_answers: list[dict[str, str]],
     hint_mode: str = "none",
-    judge_vendor: Optional[str] = None,
-    label_to_vendor: Optional[Dict[str, str]] = None
-) -> Tuple[str, str]:
+    judge_vendor: str = None,
+    label_to_vendor: dict[str, str] = None
+) -> tuple[str, str]:
     system_prompt = """You are an impartial judge. Evaluate the provided answers and respond ONLY with valid JSON.
 
 For inputs, you will be provided with a question and different answers obtained from different AI models.
@@ -113,7 +113,7 @@ Requirements:
                 )
 
         elif hint_mode == "competitors" and judge_vendor_norm:
-            all_hints: List[str] = []
+            all_hints: list[str] = []
             for label in sorted(normalized_map.keys()):
                 vendor = normalized_map[label]
                 if vendor.lower() == judge_vendor_norm:
@@ -165,7 +165,7 @@ def _strip_code_fences(s: str) -> str:
     return s.strip()
 
 
-def _find_first_json_span(s: str) -> Optional[Tuple[int, int]]:
+def _find_first_json_span(s: str) -> tuple[int, int] | None:
     """
     Return (start, end) slice for the first complete JSON object/array in s,
     using bracket balancing while respecting quoted strings.
@@ -217,7 +217,7 @@ def _find_first_json_span(s: str) -> Optional[Tuple[int, int]]:
     return None
 
 
-def extract_json_from_response(response: str) -> Dict[str, Any]:
+def extract_json_from_response(response: str) -> dict[str, Any]:
     raw = response.strip()
     raw = _strip_code_fences(raw)
 
@@ -273,7 +273,7 @@ def get_model_vendor_and_tier(answer_id: str) -> tuple:
     raise ValueError(f"Invalid answer_id format: {answer_id}")
 
 
-def calculate_statistics(data: List[float]) -> Dict[str, float]:
+def calculate_statistics(data: list[float]) -> dict[str, float]:
     if not data:
         return {"mean": 0, "std": 0, "min": 0, "max": 0, "count": 0}
     

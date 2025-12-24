@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Any, Tuple
 from scipy import stats
 
 
@@ -111,7 +110,7 @@ def calculate_tier_preference(df: pd.DataFrame, judge: str = None) -> pd.DataFra
     return vendor_tier
 
 
-def detect_self_bias(df: pd.DataFrame, target_vendor: str = 'gemini') -> Dict[str, Any]:
+def detect_self_bias(df: pd.DataFrame, target_vendor: str = 'gemini') -> dict:
     results = {}
     
     judges = df['judge'].unique()
@@ -156,7 +155,7 @@ def detect_self_bias(df: pd.DataFrame, target_vendor: str = 'gemini') -> Dict[st
     return results
 
 
-def run_statistical_tests(df: pd.DataFrame, target_vendor: str = 'gemini') -> Dict[str, Any]:
+def run_statistical_tests(df: pd.DataFrame, target_vendor: str = 'gemini') -> dict:
     results = {}
     
     target_judge = f"{target_vendor}_thinking"
