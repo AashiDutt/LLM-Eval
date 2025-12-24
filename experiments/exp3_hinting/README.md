@@ -3,47 +3,8 @@
 ## Research Question
 > **Does revealing model identities change judge behavior?**
 
-## Benchmark: MT-Bench (Official)
-- **Source**: [LMSYS FastChat](https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge/data/mt_bench)
-- **Paper**: "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (Zheng et al., 2023)
-- **Prompts**: 80 official MT-Bench questions (first turn only)
-- **Obtained Data**:
-  * [Answers](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/experiment-2/answers_new.json)
-  * [Judgments](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/tree/main/experiment-3)
-
-## Setup
-- **Answers**: Anonymized (A, B, C, D, E, F) - 6 models (2 per vendor × 3 vendors)
-- **Prompts**: 80 MT-Bench style prompts
-- **Hinting**: 4 modes (self, competitors, full, none)
-- **Judgments per group**: 480 (80 prompts × 6 judges)
-
-
-## Categories (10 prompts each)
-
-| Category | Domain | Example Task |
-|----------|--------|--------------|
-| Writing | Creative | Persuasive emails, stories, poems |
-| Roleplay | Character | Acting as different personas |
-| Reasoning | Logic | Puzzles, brain teasers |
-| Math | Quantitative | Calculations, proofs |
-| Coding | Technical | Algorithms, data structures |
-| Extraction | Information | Parsing text, NER |
-| STEM | Science | Explanations, concepts |
-| Humanities | Liberal Arts | Philosophy, history, ethics |
-
-## Models
-
-### Answer Generators (from Exp 2)
-| Vendor | Fast Tier | Thinking Tier |
-|--------|-----------|---------------|
-| Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT | GPT-5-mini | GPT-5.2 |
-| Gemini | 2.5 Flash | 3 Pro Preview |
-
-### Judges
-- `gemini_fast`, `gemini_thinking`
-- `claude_fast`, `claude_thinking`
-- `gpt_fast`, `gpt_thinking`
+We use the same models from [`exp2_mt_bench`](../exp2_mt_bench/). Please check out the details
+before proceeding with the rest of the sections.
 
 ## Design: Partial Hinting Control Groups
 
@@ -54,7 +15,8 @@
 | **Group 3** | `full` | All models revealed | Full transparency |
 | **Group 4** | `none` | No hints (blind) | Baseline control |
 
-> **Note**: Group 4 (`none`) is essentially **Experiment 2** - it uses the same blind judgment protocol with no model identity hints. The judgments are reused from Experiment 2's results.
+> [!NOTE] 
+> Group 4 (`none`) is essentially **Experiment 2** - it uses the same blind judgment protocol with no model identity hints. The judgments are reused from Experiment 2's results.
 
 ## Main Metrics Comparison (clarified units + definitions)
 
@@ -125,11 +87,12 @@ Average self-bias rates by category for each hinting group, aggregated across al
 | **Balanced Selection** | Group 3 (Full) | Best **Deviation**, **Balance**, and **Consistency**  | Highest Average Self-Bias (43.96%) |
 | **Use only if studying disruption** | Group 2 (Competitors) | Worst **Consistency** (16.11) and tends to increase instability across judges/vendors | Can amplify bias patterns in some judges |
 
-*Note: "33.33%" is a naive uniform baseline (3 vendors). Real-world "unbiased" rates can differ due to answer quality, prompt mix, and judge preference for style.*
+> [!NOTE]
+> "33.33%" is a naive uniform baseline (3 vendors). Real-world "unbiased" rates can differ due to answer quality, prompt mix, and judge preference for style.*
 
 
 <details>
-<summary><b>Quick Start</b></summary>
+<summary><b>Run the scripts</b></summary>
 
 ```bash
 cd /path/to/LLM_Eval
