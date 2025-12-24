@@ -18,7 +18,7 @@ before proceeding with the rest of the sections.
 > [!NOTE] 
 > Group 4 (`none`) is essentially **Experiment 2** - it uses the same blind judgment protocol with no model identity hints. The judgments are reused from Experiment 2's results.
 
-## Main Metrics Comparison (clarified units + definitions)
+## Main Metrics Comparison 
 
 We compared the four hinting groups across fairness/stability metrics. **Lower is better** for all metrics below, but note that **“more balanced” ≠ “unbiased”** (it only means Top-1 wins are more evenly spread).
 
