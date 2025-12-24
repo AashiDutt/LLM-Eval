@@ -1,6 +1,7 @@
 # LLMs as Judges: Measuring Bias, Hinting Effects, and Tier Preferences
 
-A comprehensive framework to test whether AI judges show self-preference bias when evaluating answers from different LLMs.
+A comprehensive framework to test whether AI judges show self-preference bias when evaluating answers from different models. We take the MT-Bench benchmark to conduct our analyses but we believe it's extensible to
+other frameworks.
 
 ## Research Questions
 
@@ -32,6 +33,10 @@ LLM_Eval/
 │   ├── exp1_blind_judge/         # Experiment 1: Blind judge evaluation
 │   ├── exp2_mt_bench/            # Experiment 2: MT-Bench domain analysis
 │   └── exp3_hinting/             # Experiment 3: Hinting effect analysis
+├── utils/
+│   ├── regenerate_dubious_answers.py         # Regenerate answers that are dubious.
+│   ├── regenerate_failed_judgments.py        # Regenerate judgments that led to errors.
+│   └── exp3_hinting/
 ├── requirements.txt
 └── README.md
 ```
@@ -118,7 +123,7 @@ jupyter notebook experiments/exp3_hinting/analysis.ipynb
 </details>
 
 <details>
-<summary><b>Key Findings</b></summary>
+<summary><b>Experiment-wise Findings</b></summary>
 
 ### Experiment 1: Blind Judge
 | Judge | Picks Own Vendor | Others Pick Same | Self-Bias? |
@@ -127,8 +132,9 @@ jupyter notebook experiments/exp3_hinting/analysis.ipynb
 | Claude | 60% | 60% (Gemini agrees) | No |
 | **GPT** | **80%** | 20% | **+60% bias** |
 
-**GPT shows strong self-preference bias** (+60% vs other judges).  
-Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
+> [!NOTE]
+> **GPT shows strong self-preference bias** (+60% vs other judges).  
+> Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
 
 ### Experiment 2: MT-Bench Domain Analysis
 - **GPT self-bias**: 70% overall, strongest in Writing (90%) and Roleplay (85%)
@@ -136,7 +142,7 @@ Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
 - **Gemini**: Shows bias in Math (80%) and Reasoning (60%) - its core strengths
 - **Domain variation**: Bias patterns vary significantly by task type
 
-### Experiment 3: Hinting Effect
+### Experiment 3: Hinting Effect (with MT-Bench)
 - **Overall finding**: Hinting has **minimal impact** (<2pp change from baseline)
 - **Group 1 (Self)**: Lowest average self-bias (41.25%)
 - **Group 3 (Full)**: Best balance and consistency (most fair overall)
@@ -149,11 +155,12 @@ Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
 ## Acknowledgment
 
 <div align="center">
-  <img src="google.png" alt="Google" height="60" style="margin-right: 20px;">
-  <img src="hf-logo.png" alt="Hugging Face" height="60">
+  <img src="assets/google.png" alt="Google" height="60" style="margin-right: 20px;">
+  <img src="assets/hf-logo.png" alt="Hugging Face" height="60">
 </div>
 
 Developed during Google's ML Developer Programs AI Sprint 2025 H2, this project benefited from generous GCP credits that facilitated its completion. We express our gratitude to the MLDP team for the support provided.
+Sayak acknowledges the support he received from Hugging Face in terms of the API credits.
 
 ## 📄 License
 

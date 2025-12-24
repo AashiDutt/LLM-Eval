@@ -1,0 +1,3 @@
+Found 7 failed judgments. Regenerating...
+Regenerating judgments:   0%|          | 0/7 [00:00<?, ?it/s]Regenerating judgments:  14%|█▍        | 1/7 [00:38<03:51, 38.54s/it]Regenerating judgments:  29%|██▊       | 2/7 [00:51<01:58, 23.67s/it]Regenerating judgments:  43%|████▎     | 3/7 [00:54<00:55, 13.89s/it]Regenerating judgments:  57%|█████▋    | 4/7 [00:55<00:26,  8.82s/it]Regenerating judgments:  71%|███████▏  | 5/7 [01:02<00:16,  8.15s/it]Regenerating judgments:  86%|████████▌ | 6/7 [01:05<00:06,  6.69s/it]Regenerating judgments: 100%|██████████| 7/7 [01:06<00:00,  4.72s/it]Regenerating judgments: 100%|██████████| 7/7 [01:06<00:00,  9.51s/it]
+Updated judgments written to experiments/exp3_hinting/data/judgments/group2_full.json
