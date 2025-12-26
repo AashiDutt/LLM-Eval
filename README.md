@@ -36,7 +36,6 @@ LLM_Eval/
 ├── utils/
 │   ├── regenerate_dubious_answers.py         # Regenerate answers that are dubious.
 │   ├── regenerate_failed_judgments.py        # Regenerate judgments that led to errors.
-│   └── exp3_hinting/
 ├── requirements.txt
 └── README.md
 ```
