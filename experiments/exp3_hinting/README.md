@@ -8,6 +8,8 @@ before proceeding with the rest of the sections.
 
 ## Design: Partial Hinting Control Groups
 
+We divided this experiment into groups of experiments each having a different purpose.
+
 | Group | Hint Mode | What Judge Sees | Purpose |
 |-------|-----------|-----------------|---------|
 | **Group 1** | `self` | Only own model revealed | Self-knowledge effect |
@@ -15,12 +17,11 @@ before proceeding with the rest of the sections.
 | **Group 3** | `full` | All models revealed | Full transparency |
 | **Group 4** | `none` | No hints (blind) | Baseline control |
 
-> [!NOTE] 
-> Group 4 (`none`) is essentially **Experiment 2** - it uses the same blind judgment protocol with no model identity hints. The judgments are reused from Experiment 2's results.
+> [*Note:*] Group 4 (`none`) is essentially Experiment 2, as it uses the same blind judgment protocol with no model identity hints. The judgments are reused from Experiment 2's results.
 
 ## Main Metrics Comparison 
 
-We compared the four hinting groups across fairness/stability metrics. **Lower is better** for all metrics below, but note that **“more balanced” ≠ “unbiased”** (it only means Top-1 wins are more evenly spread).
+We compared the four hinting groups across key metrics. Lower values are better for all metrics. A low Balance Score is about “evenness,” not necessarily “fairness.” It can improve simply because judges spread wins more evenly.
 
 | Metric | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) | Best |
 |--------|----------------|----------------------|----------------|-----------------|------|
@@ -29,66 +30,59 @@ We compared the four hinting groups across fairness/stability metrics. **Lower i
 | **Balance Score (pp, stdev)** | 15.50 | 14.96 | 13.10 | 14.07 | Group 3 |
 | **Consistency (pp, stdev)** | 15.57 | 16.11 | 14.00 | 15.52 | Group 3 |
 
-**Units**
+**Metrics used:**
 
-- **pp** = *percentage points* (arithmetic difference between percentages).
-- **stdev (pp)** = standard deviation computed on percentages, reported in percentage points.
+- **pp**: *percentage points* — the simple arithmetic difference between two percentages (e.g., 80% - 20% = 60 percentage points).
 
-**Metric definitions**
+- **stdev (pp)**: *standard deviation* — a measure of how spread out values are. Calculated on percentages and reported in percentage points. Lower values mean less variation (more consistent).
 
-- **Average Self-Bias (%)**: For each **vendor** \(v ∈ {Claude, GPT, Gemini}\), compute  
-  `self_bias(v) = P(judges from v pick v as Top-1)`.  
-  Then report the **mean** of `self_bias(v)` across the three vendors.
+- **Average Self-Bias (%)**: For each vendor (Claude, GPT, Gemini), we calculate how often that vendor's judges rank their own vendor's answers as #1. Values are aggregated across fast and thinking tier judges. Then we average these three percentages together. This tells us the overall self-bias across all vendors.
 
-- **Deviation from Expected (pp)**: For each vendor \(v\), compute  
-  `|self_bias(v) − 33.33%|` (naive baseline for 3 vendors), then average across vendors.
+- **Deviation from Expected (pp)**: For each vendor, we calculate how far their self-bias rate is from 33.33% (the expected rate if judges were perfectly unbiased across 3 vendors). Self-bias rates are aggregated across fast and thinking tiers for each vendor. We take the absolute difference, then average across all three vendors. This measures how close we are to the unbiased baseline.
 
-- **Balance Score (pp, stdev)**: Compute overall Top-1 win rate for each vendor across **all judges**, then take the **standard deviation** across the three vendors. Lower = more even Top-1 distribution.
+- **Balance Score (pp, stdev)**: We calculate the overall Top-1 win rate for each vendor across all 6 judges combined (fast and thinking tiers for all vendors), giving us three percentages (one per vendor). Then we calculate the standard deviation of these three percentages. A lower score means the three vendors' win rates are more similar to each other (more evenly distributed), regardless of whether that distribution is fair or biased.
 
-- **Consistency (pp, stdev)**: Compute each **judge model’s** self-bias rate, then take the **standard deviation** across the 6 judges. Lower = judges behave more similarly.
-
-> **Note:** A low **Balance Score** is about “evenness,” not necessarily “fairness.” It can improve simply because judges spread wins more evenly—even if they’re spreading them for the wrong reasons.
+- **Consistency (pp, stdev)**: For each of the 6 individual judge models, we calculate their self-bias rate. Then we calculate the standard deviation of these 6 rates. A lower score means all judges behave more similarly to each other (less variation in self-bias across different judge models).
 
 ## Vendor-Specific Self-Bias Rates
 
-Self-bias rates for each vendor across different hinting groups, aggregated across fast and thinking tiers. Values show the percentage of times each vendor's judges rank their own vendor's answers as #1.
+Self-bias rates for each vendor across different hinting groups, aggregated across fast and thinking tiers. Values show the percentage of times each vendor's judges rank their own vendor's answers as #1(aggregated across fast and thinking tiers).
 
-| Vendor | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) |
+| Vendor (fast + thinking) | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) |
 |--------|----------------|----------------------|----------------|-----------------|
 | **Claude** | 25.6% | 36.2% | 34.4% | 30.0% |
 | **GPT** | 62.5% | 65.6% | 63.7% | 64.4% |
 | **Gemini** | 35.6% | 28.1% | 33.8% | 33.1% |
 
-*Self-bias rate = percentage of times a judge ranks their own vendor #1 (aggregated across fast and thinking tiers)*
+We found that GPT judges show consistently high self-bias across all hinting groups, while Claude judges exhibit the lowest self-bias, particularly in Group 1 (Self-hint) at 25.6%. While Gemini judges show moderate self-bias with Group 2 (Competitors-hint) producing the lowest rate at 28.1%. 
 
 ## Domain-wise Best Group
 
-Average self-bias rates by category for each hinting group, aggregated across all vendors and tiers. Best Group column indicates which hinting mode produces the lowest self-bias for that category.
+Average self-bias rates by category for each hinting group, aggregated across all vendors and tiers. Best Group column indicates which hinting mode produces the lowest self-bias for that category(aggregated across fast and thinking tiers).
 
 | Category | Group 1 (Self) | Group 2 (Competitors) | Group 3 (Full) | Group 4 (Blind) | Best Group |
 |----------|----------------|----------------------|----------------|-----------------|------------|
-| Extraction | **31.7%** | 38.3% | 33.3% | 35.0% | **Group 1** |
-| Humanities | **36.7%** | 38.3% | 36.7% | 36.7% | **Group 1** |
-| Math | **46.7%** | 51.7% | 51.7% | 50.0% | **Group 1** |
-| Reasoning | **41.7%** | 43.3% | 41.7% | 41.7% | **Group 1** |
-| Writing | **38.3%** | 43.3% | 38.3% | 45.0% | **Group 1** |
-| Coding | 43.3% | 43.3% | 45.0% | **41.7%** | **Group 4** |
-| Roleplay | 55.0% | 55.0% | 61.7% | **53.3%** | **Group 4** |
-| STEM | 36.7% | **33.3%** | 43.3% | 36.7% | **Group 2** |
+| Extraction | 31.7% | 38.3% | 33.3% | 35.0% | Group 1 |
+| Humanities | 36.7% | 38.3% | 36.7% | 36.7% | Group 1 |
+| Math | 46.7% | 51.7% | 51.7% | 50.0% | Group 1 |
+| Reasoning | 41.7% | 43.3% | 41.7% | 41.7% | Group 1 |
+| Writing | 38.3% | 43.3% | 38.3% | 45.0% | Group 1 |
+| Coding | 43.3% | 43.3% | 45.0% | 41.7% | Group 4 |
+| Roleplay | 55.0% | 55.0% | 61.7% | 53.3% | Group 4 |
+| STEM | 36.7% | 33.3% | 43.3% | 36.7% | Group 2 |
 
-*Best = lowest average self-bias across all vendors for that category (aggregated across fast and thinking tiers)*
+Group 1 (Self-hint) minimizes self-bias in 5 of 8 categories, while Group 4 (Blind) performs best for Coding and Roleplay, and Group 2 (Competitors-hint) is optimal for STEM tasks. This suggests that hinting effects are both vendor-specific and domain-dependent.
 
 ## Goal-Based Recommendations
 
-| Goal | Recommended Group | Rationale | Trade-offs |
-|------|------------------|-----------|------------|
-| **Benchmark Validity** | Group 4 (Blind) | Most defensible protocol; minimizes identity leakage | Baseline self-bias remains (42.50%) |
-| **Bias Mitigation** | Group 1 (Self) | Lowest **Average Self-Bias** (41.25%) | Weaker balance/consistency than Group 3 |
-| **Balanced Selection** | Group 3 (Full) | Best **Deviation**, **Balance**, and **Consistency**  | Highest Average Self-Bias (43.96%) |
-| **Use only if studying disruption** | Group 2 (Competitors) | Worst **Consistency** (16.11) and tends to increase instability across judges/vendors | Can amplify bias patterns in some judges |
+Here are some hinting group recommendations based on our evaluation:
 
-> [!NOTE]
-> "33.33%" is a naive uniform baseline (3 vendors). Real-world "unbiased" rates can differ due to answer quality, prompt mix, and judge preference for style.*
+| Goal | Recommended Group | Why | Trade-off |
+|------|------------------|-----|----------|
+| **Benchmark Validity** | Group 4 (Blind) | Judges don't know model identities and it matches standard evaluation practice | Self-bias remains at 42.50% (not the lowest) |
+| **Bias Mitigation** | Group 1 (Self) | Self-bias drops to 41.25% (lowest across all groups) | Balance score and consistency are worse than Group 3 |
+| **Balanced Selection** | Group 3 (Full) | Best balance, consistency, and deviation | Self-bias is highest at 43.96% |
+| **Study Disruption** | Group 2 (Competitors) | Reveals how knowing competitors (but not self) changes judge behavior | Worst consistency and increases bias for some vendors |
 
 
 <details>
