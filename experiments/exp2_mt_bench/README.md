@@ -3,48 +3,6 @@
 ## Research Question
 > **Does judge bias vary across different domains/task types?**
 
-## Benchmark: MT-Bench (Official)
-- **Source**: [LMSYS FastChat](https://github.com/lm-sys/FastChat/tree/main/fastchat/llm_judge/data/mt_bench)
-- **Paper**: "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena" (Zheng et al., 2023)
-- **Prompts**: 80 official MT-Bench questions (first turn only)
-- **Obtained Data**:
-  * [Answers](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/experiment-2/answers_new.json)
-  * [Judgments](https://huggingface.co/datasets/sayakpaul/llm-bias-mt-bench/blob/main/experiment-2/judgments_new.json)
-
-## Setup
-- **Answers**: Anonymized (A, B, C, D, E, F)
-- **Prompts**: 80 MT-Bench style prompts
-- **Hinting**: None (blind evaluation)
-- **Judgments**: 480 (80 prompts × 6 judges)
-
-## Categories (10 prompts each)
-
-| Category | Domain | Example Task |
-|----------|--------|--------------|
-| Writing | Creative | Persuasive emails, stories, poems |
-| Roleplay | Character | Acting as different personas |
-| Reasoning | Logic | Puzzles, brain teasers |
-| Math | Quantitative | Calculations, proofs |
-| Coding | Technical | Algorithms, data structures |
-| Extraction | Information | Parsing text, NER |
-| STEM | Science | Explanations, concepts |
-| Humanities | Liberal Arts | Philosophy, history, ethics |
-
-## Models
-
-| Vendor | Fast Tier | Thinking Tier |
-|--------|-----------|---------------|
-| Claude | Haiku 4.5 | Sonnet 4.5 |
-| GPT | GPT-5-mini | GPT-5.2 |
-| Gemini | 2.5 Flash | 3 Pro Preview |
-
-### Judges
-- `claude_fast`, `claude_thinking`
-- `gpt_fast`, `gpt_thinking`
-- `gemini_fast`, `gemini_thinking`
-
----
-
 ## Results
 
 ### 1. Self-Bias Detection 
