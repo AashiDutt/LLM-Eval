@@ -3,9 +3,6 @@
 ## Research Question
 > **Does revealing model identities change judge behavior?**
 
-We use the same models from [`exp2_mt_bench`](../exp2_mt_bench/). Please check out the details
-before proceeding with the rest of the sections.
-
 ## Design: Partial Hinting Control Groups
 
 We divided this experiment into groups of experiments each having a different purpose.
@@ -29,20 +26,6 @@ We compared the four hinting groups across key metrics. Lower values are better 
 | **Deviation from Expected (pp)** | 13.06 pp | 13.47 pp | 10.63 pp | 11.53 pp | Group 3 |
 | **Balance Score (pp, stdev)** | 15.50 | 14.96 | 13.10 | 14.07 | Group 3 |
 | **Consistency (pp, stdev)** | 15.57 | 16.11 | 14.00 | 15.52 | Group 3 |
-
-**Metrics used:**
-
-- **pp**: *percentage points* — the simple arithmetic difference between two percentages (e.g., 80% - 20% = 60 percentage points).
-
-- **stdev (pp)**: *standard deviation* — a measure of how spread out values are. Calculated on percentages and reported in percentage points. Lower values mean less variation (more consistent).
-
-- **Average Self-Bias (%)**: For each vendor (Claude, GPT, Gemini), we calculate how often that vendor's judges rank their own vendor's answers as #1. Values are aggregated across fast and thinking tier judges. Then we average these three percentages together. This tells us the overall self-bias across all vendors.
-
-- **Deviation from Expected (pp)**: For each vendor, we calculate how far their self-bias rate is from 33.33% (the expected rate if judges were perfectly unbiased across 3 vendors). Self-bias rates are aggregated across fast and thinking tiers for each vendor. We take the absolute difference, then average across all three vendors. This measures how close we are to the unbiased baseline.
-
-- **Balance Score (pp, stdev)**: We calculate the overall Top-1 win rate for each vendor across all 6 judges combined (fast and thinking tiers for all vendors), giving us three percentages (one per vendor). Then we calculate the standard deviation of these three percentages. A lower score means the three vendors' win rates are more similar to each other (more evenly distributed), regardless of whether that distribution is fair or biased.
-
-- **Consistency (pp, stdev)**: For each of the 6 individual judge models, we calculate their self-bias rate. Then we calculate the standard deviation of these 6 rates. A lower score means all judges behave more similarly to each other (less variation in self-bias across different judge models).
 
 ## Vendor-Specific Self-Bias Rates
 
