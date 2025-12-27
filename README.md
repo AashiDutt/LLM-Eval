@@ -54,11 +54,13 @@ LLM_Eval/
 
 * Experiment 1 is a baby experiment that helped us gain intuition and decide the next steps of the project.
 * Experiment 3 was conducted with MT-Bench.
+* We have used *33.33%* as a naive uniform baseline (3 vendors) for all experiments. Please note that real-world "unbiased" rates can differ due to answer quality, prompt mix, and judge preference.
 
 <details>
 <summary><b>Quick Start</b></summary>
 
 ### Setup
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
@@ -66,7 +68,9 @@ pip install -r requirements.txt
 ```
 
 ### Configure API Keys
+
 Create `.env` file:
+
 ```bash
 ANTHROPIC_API_KEY=your_key
 OPENAI_API_KEY=your_key
@@ -130,29 +134,39 @@ jupyter notebook experiments/exp3_hinting/analysis.ipynb
 <summary><b>Experiment-wise Findings</b></summary>
 
 ### Experiment 1: Blind Judge
+
+We compared how often each judge ranks its own vendor's answers as #1 versus how often other judges rank that same vendor as #1. The comparison helps distinguish between self-bias and genuine quality advantages. We used each vendor's thinking-tier as judge model only.
+
 | Judge | Picks Own Vendor | Others Pick Same | Self-Bias? |
 |-------|------------------|------------------|------------|
-| Gemini | 20% | 20% (Claude) | No |
-| Claude | 60% | 60% (Gemini agrees) | No |
-| **GPT** | **80%** | 20% | **+60% bias** |
+| Gemini | 20% | 10% (avg of Claude & GPT) | No |
+| Claude | 60% | 40% (avg of Gemini & GPT) | No |
+| GPT | 80% | 20% (avg of Claude & Gemini) | Yes, ~60% bias |
 
-> [!NOTE]
-> **GPT shows strong self-preference bias** (+60% vs other judges).  
-> Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
+> NOTE:
+
+GPT shows strong self-preference bias (+60% vs other judges).  
+Claude's 60% win rate is due to quality, not bias (Gemini judge agrees).
 
 ### Experiment 2: MT-Bench Domain Analysis
+
+We evaluated self-bias patterns across 8 domains using the MT-Bench benchmark (80 prompts). All 6 judges (fast and thinking tiers for each vendor) evaluated anonymized answers in blind conditions. Results are aggregated across fast and thinking tiers for each vendor family.
+
 - **GPT self-bias**: 70% overall, strongest in Writing (90%) and Roleplay (85%)
 - **Claude**: Least biased (~32.5%), maintains impartiality across domains
 - **Gemini**: Shows bias in Math (80%) and Reasoning (60%) - its core strengths
 - **Domain variation**: Bias patterns vary significantly by task type
 
 ### Experiment 3: Hinting Effect (with MT-Bench)
-- **Overall finding**: Hinting has **minimal impact** (<2pp change from baseline)
+
+We tested whether revealing model identities to judges affects their bias by comparing 4 hinting groups: self-only, competitors-only, full transparency, and blind baseline. Using the same MT-Bench setup as Experiment 2, all 6 judges (aggregated across fast and thinking tiers) evaluated answers under different hinting conditions.
+
+- **Overall finding**: Hinting has minimal impact (<2pp change from baseline)
 - **Group 1 (Self)**: Lowest average self-bias (41.25%)
 - **Group 3 (Full)**: Best balance and consistency (most fair overall)
 - **GPT**: Persistent high bias (62-66%) regardless of hinting condition
 - **Claude**: Shows self-awareness when identity revealed (25.6% self-bias)
-- **Recommendation**: Use **Group 3 (Full transparency)** for best balance and fairness
+- **Recommendation**: Use Group 3 (Full transparency) for best balance and fairness
 
 </details>
 
