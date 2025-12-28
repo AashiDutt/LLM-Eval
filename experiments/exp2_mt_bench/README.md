@@ -53,11 +53,11 @@ We calculated how often each vendor's judges rank their own vendor's answers on 
 
 Note that the values in the table below are aggregated across fast and thinking tiers for each vendor family.
 
-| Judge | Self-Preference | Baseline | Bias (pp) | Bias Level |
+| Judge | Self-Preference | Baseline | Bias (pp) | Self Preference Level |
 |-------|-----------------|----------|-----------|---------|
-| **Claude** | 32.50% | 33.33% | +8.75 | Least Biased |
-| **Gemini** | 31.25% | 33.33% | +11.50 | Mild Biased |
-| **GPT** | 70.00% | 33.33% | +36.67 | Most Biased |
+| **Claude** | 32.50% | 33.33% | -0.83 | Near neutral |
+| **Gemini** | 31.25% | 33.33% | -2.08 | Near neutral |
+| **GPT** | 70.00% | 33.33% | +36.67 | Strong self-preference |
 
 **Self-Preference**: Percentage of times the vendor's judges rank their own vendor as #1
 
@@ -80,9 +80,9 @@ The table below depicts the percentage of times each judge ranks each vendor's a
 
 *Bold values indicate self-preference (judge ranking their own vendor).*
 
-### 3. Average Scores by Vendor & Tier 
+### 3. Tier effects via score distributions 
 
-Average scores (0-10 scale) given by Gemini Thinking as judge to each vendor's fast vs thinking tier models. 
+To check whether “thinking” tiers systematically score higher, we compare mean ± std scores (0–10) assigned by a single judge (Gemini Thinking) to each vendor’s fast vs thinking models across 80 prompts.
 
 | Vendor | Fast Tier | Thinking Tier |
 |--------|-----------|---------------|
@@ -90,7 +90,7 @@ Average scores (0-10 scale) given by Gemini Thinking as judge to each vendor's f
 | Gemini | 6.01 ± 3.41 | 7.55 ± 2.75 |
 | GPT | 7.05 ± 3.26 | 8.47 ± 2.21 |
 
-**Mean ± standard deviation, where standard deviation shows score variability across 80 prompts (single run).*
+Thinking tiers score higher for all vendors (≈ +0.7 to +1.5 points here), but variance remains non-trivial across prompts.
 
 ### 4. Category-wise Preferences by Judge Family
 
@@ -165,7 +165,7 @@ We tested preference for each tier for all models. For each vendor, we calculate
 
 ### Overall Self-Bias Patterns
 
-GPT judges show the strongest self-preference bias, ranking their own answers #1 significantly more often than expected. Claude demonstrates the least bias, with self-preference rates close to the baseline and actually favoring GPT answers over its own. Gemini shows mild self-bias, particularly in its core strength domains. While GPT answers are selected most frequently even by non-GPT judges (suggesting genuine quality advantages), the substantial gap between GPT judge preferences and other judges' preferences indicates clear self-bias is present.
+GPT judges show the strongest self-preference bias, ranking their own answers #1 significantly more often than expected (+36.67 pp above baseline). Claude demonstrates the least bias, with self-preference rates slightly below the baseline (-0.83 pp) and actually favoring GPT answers over its own. Gemini also shows less self-bias than expected overall (-2.08 pp), but demonstrates strong domain-specific self-bias in its core strength domains (Math: 80%, Reasoning: 60%). While GPT answers are selected most frequently even by non-GPT judges (suggesting genuine quality advantages), the substantial gap between GPT judge preferences and other judges' preferences indicates clear self-bias is present.
 
 ### Domain-wise Breakdown
 
